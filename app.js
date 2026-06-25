@@ -2176,7 +2176,7 @@ async function loadReportsData() {
 
         const [reqRes, userRes, typeRes, deptRes] = await Promise.all([
             supabaseClient.from('ot_requests').select('*').order('date_start', { ascending: false }),
-            supabaseClient.from('users').select('id, fullname, department'),
+            supabaseClient.from('users').select('id, fullname, department, agency, avatar_url'),
             supabaseClient.from('ot_types').select('*'),
             supabaseClient.from('departments').select('*') 
         ]);
@@ -2194,6 +2194,8 @@ async function loadReportsData() {
             });
         }
 
+        const agencyMapList = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
+
         allReportData = reqs.map(req => {
             const user = users.find(u => u.id === req.user_id) || {};
             const otType = otTypes.find(t => t.id === req.ot_type_id) || {};
@@ -2206,9 +2208,12 @@ async function loadReportsData() {
             return {
                 ...req,
                 fullname: user.fullname || req.user_id || '-',
+                avatar_url: user.avatar_url || '', // ✨ เพิ่มรูป
+                agency_name: agencyMapList[user.agency] || user.agency || '-', // ✨ เพิ่มชื่อหน่วยงาน
                 department_id: user.department || '-',
                 department_name: depts.find(d => d.id === user.department)?.name || user.department || '-',
                 time_range: otType.start_time ? `${otType.start_time} - ${otType.end_time}` : '-',
+                rate: otType.rate ? `${otType.rate} เท่า` : '-', // ✨ เพิ่มประเภท/เรตโอที
                 hours: parseFloat(hrs),
                 description: req.description || '-' 
             };
