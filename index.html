@@ -334,17 +334,17 @@
               <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
     <h3 class="font-bold text-slate-800 text-lg w-full sm:w-auto">รายการรออนุมัติ OT</h3>
     
-    <div class="flex items-center gap-3 w-full sm:w-auto">
-        <button onclick="loadApprovalQueueData()" class="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center">
-            <i class='bx bx-refresh mr-2'></i> รีโหลดข้อมูล
-        </button>
-        <button onclick="bulkApproveSteps('Approved')" class="px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center">
-            <i class='bx bx-check mr-2'></i> อนุมัติที่เลือก
-        </button>
-        <button onclick="bulkApproveSteps('Rejected')" class="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center">
-            <i class='bx bx-x mr-2'></i> ไม่อนุมัติที่เลือก
-        </button>
-    </div>
+    <div class="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:gap-3">
+    <button onclick="loadApprovalQueueData()" class="p-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex flex-col sm:flex-row items-center justify-center text-center whitespace-nowrap">
+        <i class='bx bx-refresh text-xl sm:mr-2 mb-1 sm:mb-0'></i> รีโหลด
+    </button>
+    <button onclick="bulkApproveSteps('Approved')" class="p-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex flex-col sm:flex-row items-center justify-center text-center whitespace-nowrap">
+        <i class='bx bx-check text-xl sm:mr-2 mb-1 sm:mb-0'></i> อนุมัติ
+    </button>
+    <button onclick="bulkApproveSteps('Rejected')" class="p-2 sm:px-4 sm:py-2 bg-red-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-red-600 transition-colors shadow-md flex flex-col sm:flex-row items-center justify-center text-center whitespace-nowrap">
+        <i class='bx bx-x text-xl sm:mr-2 mb-1 sm:mb-0'></i> ไม่อนุมัติ
+    </button>
+</div>
 </div>
 
 <div class="overflow-x-auto rounded-xl border border-slate-100">
@@ -676,7 +676,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
             <h3 class="font-bold text-lg text-emerald-800" id="workdayModalTitle"><i class='bx bxs-calendar-check mr-2'></i>เพิ่มวันทำงาน</h3>
-            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formWdOldName">
@@ -804,7 +804,7 @@
   <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[85dvh] my-auto">
     <div class="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
         <h3 class="font-bold text-lg text-slate-800"><i class='bx bx-edit-alt text-blue-500 mr-2'></i>แบบฟอร์มขออนุมัติทำงานล่วงเวลา</h3>
-        <button onclick="closeRequestFormModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        <button onclick="closeRequestFormModal()" class="text-slate-400 hover:text-slate-600 text-3xl p-2">&times;</button>
       </div>
       
       <div class="p-6 space-y-5 overflow-y-auto flex-1">
@@ -850,7 +850,7 @@
   <div class="bg-white rounded-2xl w-full max-w-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] my-auto">
     <div class="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
         <h3 class="font-bold text-lg text-slate-800">เลือกผู้อนุมัติ <span class="text-sm font-normal text-slate-500">(เลือกตามลำดับ 1, 2, 3)</span></h3>
-        <button onclick="closeApproverModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        <button onclick="closeApproverModal()" class="text-slate-400 hover:text-slate-600 text-3xl p-2">&times;</button>
       </div>
       
       <div id="approver-list-container" class="p-6 overflow-y-auto bg-white flex-1">
@@ -867,7 +867,7 @@
   <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-fade-in my-auto">
     <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
             <h3 class="font-bold text-xl text-slate-800">รายละเอียดคำขอ OT</h3>
-            <button onclick="closeOTDetailModal()" class="text-slate-400 hover:text-red-500 text-2xl transition-colors">&times;</button>
+            <button onclick="closeOTDetailModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 transition-colors">&times;</button>
         </div>
 
         <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
@@ -949,7 +949,7 @@
             </h3>
             <p class="text-sm text-blue-600 mt-0.5" id="modalDeptCount">0 คำขอ</p>
         </div>
-        <button onclick="closeDeptOTListModal()" class="text-slate-400 hover:text-red-500 text-2xl transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white">&times;</button>
+        <button onclick="closeDeptOTListModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white">&times;</button>
       </div>
 
       <div class="grid grid-cols-12 gap-2 p-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
@@ -969,7 +969,7 @@
     <div class="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-blue-50">
             <h3 class="font-bold text-lg text-blue-800" id="userModalTitle"><i class='bx bxs-user-detail mr-2'></i>เพิ่มผู้ใช้งานใหม่</h3>
-            <button onclick="closeUserModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeUserModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formUserId">
@@ -1049,7 +1049,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
             <h3 class="font-bold text-lg text-indigo-800" id="agencyModalTitle"><i class='bx bxs-buildings mr-2'></i>เพิ่มหน่วยงานใหม่</h3>
-            <button onclick="closeAgencyModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeAgencyModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formAgencyOldId">
@@ -1072,7 +1072,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-teal-50">
             <h3 class="font-bold text-lg text-teal-800" id="deptModalTitle"><i class='bx bxs-group mr-2'></i>เพิ่มฝ่ายใหม่</h3>
-            <button onclick="closeDeptModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeDeptModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formDeptOldId">
@@ -1096,7 +1096,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-rose-50">
             <h3 class="font-bold text-lg text-rose-800" id="holidayModalTitle"><i class='bx bxs-calendar-star mr-2'></i>เพิ่มวันหยุดใหม่</h3>
-            <button onclick="closeHolidayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeHolidayModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formHolOldId">
@@ -1123,7 +1123,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-orange-50">
             <h3 class="font-bold text-lg text-orange-800" id="otTypeModalTitle"><i class='bx bxs-time-five mr-2'></i>เพิ่มเวลาโอทีใหม่</h3>
-            <button onclick="closeOTTypeModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeOTTypeModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formOtOldId">
@@ -1157,7 +1157,7 @@
     <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
             <h3 class="font-bold text-lg text-emerald-800" id="workdayModalTitle"><i class='bx bxs-calendar-check mr-2'></i>เพิ่มวันทำงาน</h3>
-            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
         <div class="p-6 space-y-4">
             <input type="hidden" id="formWdOldId">

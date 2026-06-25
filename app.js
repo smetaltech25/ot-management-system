@@ -693,6 +693,20 @@ function renderApproversGrid(approvers, container) {
             groupedSU[groupName].push(u);
         });
 
+        // ✨ ดึงกลุ่ม หัวหน้าMachine - ฝ่ายผลิต MA มาสร้างการ์ดไว้บนสุดก่อน ✨
+        const topGroup = 'หัวหน้าMachine - ฝ่ายผลิต MA';
+        if (groupedSU[topGroup]) {
+            const topHeader = document.createElement('h4');
+            topHeader.className = 'font-bold text-slate-700 mt-5 mb-3 text-[15px]';
+            topHeader.innerText = topGroup;
+            container.appendChild(topHeader);
+            container.appendChild(createGrid(groupedSU[topGroup]));
+            
+            // วาดเสร็จแล้วลบออกจาก object จะได้ไม่ถูกนำไปวาดซ้ำด้านล่าง
+            delete groupedSU[topGroup];
+        }
+
+        // วาดกลุ่มอื่นๆ ที่เหลือตามปกติ
         for (const gName in groupedSU) {
             const deptHeader = document.createElement('h4');
             deptHeader.className = 'font-bold text-slate-700 mt-5 mb-3 text-[15px]';
@@ -861,7 +875,14 @@ async function openOTDetailModal(reqId) {
         const avatarUrl = getAvatarUrl(userData?.fullname, userData?.avatar_url);
         document.getElementById('modalEmpImage').src = avatarUrl;
         document.getElementById('modalEmpName').innerText = userData?.fullname || reqData.user_id;
-        document.getElementById('modalEmpDept').innerText = `หน่วยงาน: ${userData?.agency || '-'} | ฝ่าย: ${userData?.department || '-'}`;
+        // แมปชื่อหน่วยงานและฝ่ายให้เป็นชื่อเต็ม
+        const agencyMap = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
+        const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
+
+        const agencyName = agencyMap[userData?.agency] || userData?.agency || '-';
+        const deptName = deptMap[userData?.department] || userData?.department || '-';
+
+        document.getElementById('modalEmpDept').innerText = `หน่วยงาน: ${agencyName} | ฝ่าย: ${deptName}`;
 
         document.getElementById('modalReqId').innerText = reqData.id;
         document.getElementById('modalDate').innerText = reqData.date_start;
