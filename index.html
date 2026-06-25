@@ -154,7 +154,7 @@
             </button>
           </div>
           
-          <nav class="p-4 space-y-1 overflow-hidden max-h-[calc(100vh-160px)]">
+          <nav class="p-4 space-y-1 overflow-y-auto max-h-[calc(100dvh-160px)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <p class="text-[11px] font-bold text-slate-400 mt-2 mb-2 px-4 uppercase tracking-wider transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ข้อมูลหลัก</p>
             
             <button onclick="changePage(1)" id="menuTab1" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active-menu overflow-hidden">
@@ -316,17 +316,14 @@
                   <table class="w-full text-sm text-left whitespace-nowrap">
                       <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
     <tr>
-        <th class="p-4 text-center w-12">
-            <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllCheckboxes(this)" class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
-        </th>
-        <th class="p-4 text-center">รหัส</th>
-        <th class="p-4">พนักงาน</th>
-        <th class="p-4 text-center">ประเภท</th>
-        <th class="p-4 text-center">วันที่</th>
-        <th class="p-4 text-center">เวลา</th>
-        <th class="p-4 text-center">เหตุผล</th>
-        <th class="p-4 text-center">สถานะ</th>
-        <th class="p-4 text-center">จัดการ</th>
+        <th class="p-4 text-center whitespace-nowrap">รหัสคำขอ</th>
+        <th class="p-4 whitespace-nowrap">พนักงาน</th>
+        <th class="p-4 text-center whitespace-nowrap">เวลา</th>
+        <th class="p-4 text-center whitespace-nowrap">วันที่</th>
+        <th class="p-4 text-center whitespace-nowrap">ชั่วโมง</th>
+        <th class="p-4 text-center min-w-[120px]">เหตุผล</th>
+        <th class="p-4 text-center whitespace-nowrap">สถานะ</th>
+        <th class="p-4 text-center whitespace-nowrap">จัดการ</th>
     </tr>
 </thead>
                       <tbody id="myOTRequestsTableBody" class="divide-y divide-slate-100">
