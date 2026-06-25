@@ -141,67 +141,84 @@
       
       <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-[40] hidden sm:hidden"></div>
 
-      <aside id="mainSidebar" class="w-64 bg-white border-r border-slate-100 flex flex-col justify-between flex-shrink-0 absolute inset-y-0 left-0 transform -translate-x-full sm:relative sm:translate-x-0 transition-transform duration-300 ease-in-out z-[50]">
+      <aside id="mainSidebar" class="w-64 sm:w-20 sm:hover:w-64 group bg-white border-r border-slate-100 flex flex-col justify-between flex-shrink-0 absolute inset-y-0 left-0 transform -translate-x-full sm:relative sm:translate-x-0 transition-all duration-300 ease-in-out z-[50] overflow-hidden whitespace-nowrap">
         <div>
           <div class="p-6 border-b border-slate-50 flex items-center justify-between sm:justify-start space-x-3">
-    <div class="flex items-center space-x-3">
-        <!-- ✨ ไนท์เปลี่ยนจาก div วงกลม เป็น tag img เพื่อใส่โลโก้ของพี่ต้นแล้วนะคะ ✨ -->
-        <img src="https://hperamyypofcxajmrskq.supabase.co/storage/v1/object/public/avatars/LOGO.jpg" alt="Logo" class="w-10 h-10 object-contain rounded-lg">
-        <span class="font-bold text-lg text-slate-800 dark:text-white">OverTime Management System</span>
-    </div>
-    <button onclick="toggleMobileMenu()" class="sm:hidden text-slate-400 hover:text-red-500 text-2xl">
-        <i class='bx bx-x'></i>
-    </button>
-</div>
+            <div class="flex items-center space-x-3">
+              <img src="https://hperamyypofcxajmrskq.supabase.co/storage/v1/object/public/avatars/LOGO.jpg" alt="Logo" class="w-10 h-10 object-contain rounded-lg shrink-0">
+              <span class="font-bold text-lg text-slate-800 dark:text-white transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">OMS System</span>
+            </div>
+            <button onclick="toggleMobileMenu()" class="sm:hidden text-slate-400 hover:text-red-500 text-2xl shrink-0">
+              <i class='bx bx-x'></i>
+            </button>
+          </div>
           
           <nav class="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-160px)]">
-            <p class="text-xs font-bold text-slate-400 mt-2 mb-2 px-4 uppercase tracking-wider">ข้อมูลหลัก</p>
-            <button onclick="changePage(1)" id="menuTab1" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active-menu">
-              <i class='bx bxs-home mr-3 text-xl'></i> หน้าแรก
+            <p class="text-[11px] font-bold text-slate-400 mt-2 mb-2 px-4 uppercase tracking-wider transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ข้อมูลหลัก</p>
+            
+            <button onclick="changePage(1)" id="menuTab1" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active-menu overflow-hidden">
+              <i class='bx bxs-home mr-4 text-xl shrink-0'></i> 
+              <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">หน้าแรก</span>
             </button>
-            <button onclick="changePage(2)" id="menuTab2" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-              <i class='bx bx-file mr-3 text-xl'></i> การขออนุญาต
+            <button onclick="changePage(2)" id="menuTab2" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+              <i class='bx bx-file mr-4 text-xl shrink-0'></i> 
+              <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">การขออนุญาต</span>
             </button>
-            <button onclick="changePage(3)" id="menuTab3" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-              <i class='bx bxs-calendar mr-3 text-xl'></i> ปฏิทิน OT
+            <button onclick="changePage(3)" id="menuTab3" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+              <i class='bx bxs-calendar mr-4 text-xl shrink-0'></i> 
+              <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ปฏิทิน OT</span>
             </button>
-            <button onclick="changePage(5)" id="menuTab5" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-              <i class='bx bxs-file-find mr-3 text-xl'></i> รายงาน
+            <button onclick="changePage(5)" id="menuTab5" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+              <i class='bx bxs-file-find mr-4 text-xl shrink-0'></i> 
+              <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">รายงาน</span>
             </button>
 
             <div id="adminMenuSection" style="display: none;" class="animate-fade-in pt-2">
-              <p class="text-xs font-bold text-slate-400 mt-4 mb-2 px-4 uppercase tracking-wider">ผู้ใช้งาน</p>
-              <button onclick="changePage(6)" id="menuTab6" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-user-account mr-3 text-xl'></i> ผู้ใช้งานระบบ
+              <p class="text-[11px] font-bold text-slate-400 mt-4 mb-2 px-4 uppercase tracking-wider transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ผู้ใช้งาน</p>
+              
+              <button onclick="changePage(6)" id="menuTab6" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-user-account mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ผู้ใช้งานระบบ</span>
               </button>
-              <button onclick="changePage(10)" id="menuTab10" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-shield-plus mr-3 text-xl'></i> สิทธิการใช้งาน
+              <button onclick="changePage(10)" id="menuTab10" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-shield-plus mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">สิทธิการใช้งาน</span>
               </button>
-              <p class="text-xs font-bold text-slate-400 mt-6 mb-2 px-4 uppercase tracking-wider">ตั้งค่าระบบ</p>
-              <button onclick="changePage(7)" id="menuTab7" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-buildings mr-3 text-xl'></i> ตั้งค่าหน่วยงาน
+              
+              <p class="text-[11px] font-bold text-slate-400 mt-6 mb-2 px-4 uppercase tracking-wider transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าระบบ</p>
+              
+              <button onclick="changePage(7)" id="menuTab7" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-buildings mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าหน่วยงาน</span>
               </button>
-              <button onclick="changePage(8)" id="menuTab8" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-group mr-3 text-xl'></i> ตั้งค่าฝ่าย
+              <button onclick="changePage(8)" id="menuTab8" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-group mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าฝ่าย</span>
               </button>
-              <button onclick="changePage(9)" id="menuTab9" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-time-five mr-3 text-xl'></i> ตั้งค่าโอที
+              <button onclick="changePage(9)" id="menuTab9" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-time-five mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าโอที</span>
               </button>
-              <button onclick="changePage(11)" id="menuTab11" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-calendar-x mr-3 text-xl'></i> ตั้งค่าวันหยุด
+              <button onclick="changePage(11)" id="menuTab11" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-calendar-x mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าวันหยุด</span>
               </button>
-              <button onclick="changePage(12)" id="menuTab12" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-calendar-check mr-3 text-xl'></i> ตั้งค่าวันทำงาน
+              <button onclick="changePage(12)" id="menuTab12" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-calendar-check mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าวันทำงาน</span>
               </button>
-              <button onclick="changePage(13)" id="menuTab13" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
-                <i class='bx bxs-cog mr-3 text-xl'></i> ตั้งค่าระบบ
+              <button onclick="changePage(13)" id="menuTab13" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+                <i class='bx bxs-cog mr-4 text-xl shrink-0'></i> 
+                <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ตั้งค่าระบบ</span>
               </button>
             </div>
           </nav>
         </div>
+        
         <div class="p-4 border-t border-slate-50">
-          <button onclick="logoutUsers()" class="w-full flex items-center justify-center px-4 py-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl font-medium transition-all">
-            <i class='bx bx-log-out mr-2 text-xl'></i> ออกจากระบบ
+          <button onclick="logoutUsers()" class="w-full flex items-center justify-start px-4 py-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl font-medium transition-all overflow-hidden">
+            <i class='bx bx-log-out mr-4 text-xl shrink-0'></i> 
+            <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">ออกจากระบบ</span>
           </button>
         </div>
       </aside>
