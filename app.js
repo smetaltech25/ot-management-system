@@ -628,6 +628,13 @@ function renderApproversGrid(approvers, container) {
     const superUsers = approvers.filter(u => u.role === 'SuperUser');
     const admins = approvers.filter(u => u.role === 'Admin');
     const superAdmins = approvers.filter(u => u.role === 'SuperAdmin');
+    
+    // ✨ จัดเรียงให้ชื่อที่มีคำว่า "ผู้ดูแลระบบ" ลงไปอยู่ท้ายสุดเสมอ
+    superAdmins.sort((a, b) => {
+        if (a.fullname.includes('ผู้ดูแลระบบ')) return 1; 
+        if (b.fullname.includes('ผู้ดูแลระบบ')) return -1;
+        return 0;
+    });
 
     function createCard(u) {
         const isSelectedIdx = tempSelectedApprovers.findIndex(s => s.id === u.id);
@@ -1001,21 +1008,42 @@ async function bulkApproveSteps(action) {
     const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
     
     if (checkboxes.length === 0) {
-        alert("ยังไม่ได้เลือกรายการที่ต้องการดำเนินการเลยค่ะ 😅 ติ๊กถูกข้างหน้าก่อนค่ะ");
+        Swal.fire('แจ้งเตือน', 'ยังไม่ได้เลือกรายการที่ต้องการดำเนินการ 😅 ติ๊กถูกข้างหน้าก่อนค่ะ', 'warning');
         return;
     }
 
     const actionText = action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ';
-    // ✨ เปลี่ยนข้อความ prompt ให้บอกว่าจำเป็นต้องระบุ
-    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " ทั้งหมด ${checkboxes.length} รายการ\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ (จำเป็นต้องระบุ):`);
     
-    if (reasonInput === null) return; // กรณีผู้ใช้กดยกเลิก
+    // ✨ ใช้ SweetAlert2 แทนกล่อง Prompt เดิม
+    const { value: reasonInput } = await Swal.fire({
+        title: `ยืนยันการ${actionText}`,
+        text: `ต้องการยืนยัน "${actionText}" ทั้งหมด ${checkboxes.length} รายการ\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ:`,
+        input: 'text',
+        inputPlaceholder: 'พิมพ์เหตุผลที่นี่...',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: action === 'Approved' ? '#22c55e' : '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก',
+        inputValidator: (value) => {
+            if (!value || value.trim() === '') {
+                return 'จำเป็นต้องระบุเหตุผลในการดำเนินการค่ะ ❌';
+            }
+        }
+    });
+    
+    if (!reasonInput) return; // กรณีผู้ใช้กดยกเลิก
 
-    // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
-    if (reasonInput.trim() === "") {
-        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะ`);
-        return; // หยุดการทำงานทันที
-    }
+    // ✨ โชว์หน้าต่างกำลังโหลด (Loading Spinner)
+    Swal.fire({
+        title: 'กำลังประมวลผล...',
+        html: 'ระบบกำลังบันทึกข้อมูล กรุณารอสักครู่นะคะ ⏳',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
     try {
         for (let cb of checkboxes) {
@@ -1029,7 +1057,7 @@ async function bulkApproveSteps(action) {
                 .update({ 
                     status: action, 
                     approved_at: new Date().toLocaleDateString('th-TH'),
-                    comment: reasonInput.trim() // ✨ บันทึกค่าที่ตัดช่องว่างซ้ายขวาออกแล้ว
+                    comment: reasonInput.trim()
                 })
                 .eq('id', stepId);
 
@@ -1040,14 +1068,16 @@ async function bulkApproveSteps(action) {
             }
         }
 
-        alert(`✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะ!`);
+        // ✨ เปลี่ยน Alert ตอนสำเร็จเป็น SweetAlert
+        Swal.fire('สำเร็จ!', `✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะ!`, 'success');
+        
         const selectAllCb = document.getElementById('selectAllCheckbox');
         if (selectAllCb) selectAllCb.checked = false;
         loadApprovalQueueData();
 
     } catch (err) {
         console.error("Bulk Approve Error:", err);
-        alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
     }
 }
 
