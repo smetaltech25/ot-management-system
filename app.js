@@ -250,11 +250,11 @@ async function loadMyOTDashboardData() {
             const btnView = `<button onclick="openOTDetailModal('${row.id}')" class="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm" title="ดูรายละเอียด"><i class='bx bx-show text-lg'></i></button>`;
             
             const btnEdit = isDisable 
-                ? `<button onclick="alert('รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="แก้ไขไม่ได้"><i class='bx bx-edit text-lg'></i></button>`
+                ? `<button onclick="Swal.fire('แก้ไขไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅', 'warning')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="แก้ไขไม่ได้"><i class='bx bx-edit text-lg'></i></button>`
                 : `<button onclick="editMyOTRequest('${row.id}')" class="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors shadow-sm" title="แก้ไข"><i class='bx bx-edit text-lg'></i></button>`;
                 
             const btnDelete = isDisable
-                ? `<button onclick="alert('รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถลบได้ค่ะ 😅')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="ลบไม่ได้"><i class='bx bx-trash text-lg'></i></button>`
+                ? `<button onclick="Swal.fire('ลบไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถลบได้ค่ะ 😅', 'warning')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="ลบไม่ได้"><i class='bx bx-trash text-lg'></i></button>`
                 : `<button onclick="deleteMyOTRequest('${row.id}')" class="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm" title="ลบ"><i class='bx bx-trash text-lg'></i></button>`;
 
             const tr = document.createElement('tr');
@@ -792,12 +792,12 @@ async function submitOTRequestSupabase() {
     const editId = document.getElementById("reqEditId").value; 
 
     if (!dateStart || !otType || !description) {
-        alert("กรอกข้อมูลและเลือกเวลาการ์ดโอทีให้ครบก่อนนะคะ 😊");
+        Swal.fire('ข้อมูลไม่ครบ', 'กรอกข้อมูลและเลือกเวลาการ์ดโอทีให้ครบก่อนนะคะ 😊', 'warning');
         return;
     }
 
     if (finalSelectedApprovers.length !== 3) {
-        alert(`⚠️ กรุณาเลือกผู้อนุมัติพิจารณาให้ครบ 3 ลำดับนะคะ (ตอนนี้เลือกไว้เพียง ${finalSelectedApprovers.length} ท่าน)`);
+        Swal.fire('เลือกผู้อนุมัติไม่ครบ', `⚠️ กรุณาเลือกผู้อนุมัติพิจารณาให้ครบ 3 ลำดับนะคะ (ตอนนี้เลือกไว้เพียง ${finalSelectedApprovers.length} ท่าน)`, 'warning');
         return;
     }
 
@@ -852,13 +852,15 @@ async function submitOTRequestSupabase() {
 
         await supabaseClient.from('approval_steps').insert(stepsData);
 
-        alert(editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค๊าา!" : "🚀 ส่งใบคำขอและจัดตั้งสายงานพิจารณาอนุมัติเรียบร้อยแล้วค๊าา!");
+        // ✨ อัปเกรดแจ้งเตือนตอนส่งคำขอสำเร็จเป็น SweetAlert
+        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค๊าา!" : "🚀 ส่งใบคำขอและจัดตั้งสายงานพิจารณาอนุมัติเรียบร้อยแล้วค๊าา!", 'success');
+        
         closeRequestFormModal();
         loadMyOTDashboardData(); 
 
     } catch (err) {
         console.error("Submit Request Error:", err);
-        alert("เกิดข้อผิดพลาดในการบันทึกคำขอค่ะ");
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกคำขอค่ะ', 'error');
     }
 }
 
