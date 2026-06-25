@@ -473,7 +473,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
 
     // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
     if (reasonInput.trim() === "") {
-        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะ`);
+        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยค่ะ`);
         return; // หยุดการทำงานทันที
     }
 
@@ -2315,18 +2315,19 @@ function toggleDarkMode() {
     }
 }
 
-// อัปเดตหน้าตาปุ่มสวิตช์
+// อัปเดตหน้าตาปุ่มสวิตช์ (อัปเดตให้รองรับทั้ง 2 ปุ่ม)
 function updateDarkModeKnob(isDark) {
-    const knob = document.getElementById('darkModeKnob');
-    const icon = document.getElementById('darkModeIcon');
-    if(knob && icon) {
-        if (isDark) {
-            knob.style.transform = 'translateX(24px)';
-            icon.className = 'bx bx-moon text-[10px] text-blue-500';
-        } else {
-            knob.style.transform = 'translateX(0)';
-            icon.className = 'bx bx-sun text-[10px] text-amber-500';
-        }
+    const knob1 = document.getElementById('darkModeKnob');
+    const icon1 = document.getElementById('darkModeIcon');
+    const knob2 = document.getElementById('darkModeKnob2');
+    const icon2 = document.getElementById('darkModeIcon2');
+    
+    if (isDark) {
+        if(knob1) { knob1.style.transform = 'translateX(24px)'; icon1.className = 'bx bx-moon text-[10px] text-blue-500'; }
+        if(knob2) { knob2.style.transform = 'translateX(24px)'; icon2.className = 'bx bx-moon text-[10px] text-blue-500'; }
+    } else {
+        if(knob1) { knob1.style.transform = 'translateX(0)'; icon1.className = 'bx bx-sun text-[10px] text-amber-500'; }
+        if(knob2) { knob2.style.transform = 'translateX(0)'; icon2.className = 'bx bx-sun text-[10px] text-amber-500'; }
     }
 }
 
