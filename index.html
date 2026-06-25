@@ -79,7 +79,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
-  <section class="auth-page flex items-center justify-center min-h-screen p-4 transition-colors duration-300 bg-slate-50 dark:bg-[#1f2233]" id="pageformLogin">
+  <section class="auth-page flex items-center justify-center min-h-[100dvh] w-full p-4 transition-colors duration-300 bg-slate-50 dark:bg-[#1f2233]" id="pageformLogin">
     <div class="w-full max-w-md bg-white dark:bg-[#2a2d3e] rounded-xl shadow-xl p-8 border border-slate-100 dark:border-transparent relative transition-colors duration-300">
       
       <div class="absolute top-5 right-5">
@@ -137,23 +137,22 @@
   </section>
 
   <section id="dashboardPage" style="display:none">
-    <div class="flex h-screen w-full overflow-hidden relative">
+    <div class="flex h-[100dvh] w-full overflow-hidden relative">
       
       <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-[40] hidden sm:hidden"></div>
 
       <aside id="mainSidebar" class="w-64 bg-white border-r border-slate-100 flex flex-col justify-between flex-shrink-0 absolute inset-y-0 left-0 transform -translate-x-full sm:relative sm:translate-x-0 transition-transform duration-300 ease-in-out z-[50]">
         <div>
           <div class="p-6 border-b border-slate-50 flex items-center justify-between sm:justify-start space-x-3">
-            <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 bg-gradient-to-tr from-blue-600 to-sky-400 rounded-xl flex items-center justify-center text-white text-xl shadow-md">
-                <i class='bx bxs-time-five'></i>
-              </div>
-              <span class="font-bold text-lg text-slate-800">OMS</span>
-            </div>
-            <button onclick="toggleMobileMenu()" class="sm:hidden text-slate-400 hover:text-red-500 text-2xl">
-              <i class='bx bx-x'></i>
-            </button>
-          </div>
+    <div class="flex items-center space-x-3">
+        <!-- ✨ ไนท์เปลี่ยนจาก div วงกลม เป็น tag img เพื่อใส่โลโก้ของพี่ต้นแล้วนะคะ ✨ -->
+        <img src="https://hperamyypofcxajmrskq.supabase.co/storage/v1/object/public/avatars/LOGO.jpg" alt="Logo" class="w-10 h-10 object-contain rounded-lg">
+        <span class="font-bold text-lg text-slate-800 dark:text-white">OverTime Management System</span>
+    </div>
+    <button onclick="toggleMobileMenu()" class="sm:hidden text-slate-400 hover:text-red-500 text-2xl">
+        <i class='bx bx-x'></i>
+    </button>
+</div>
           
           <nav class="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-160px)]">
             <p class="text-xs font-bold text-slate-400 mt-2 mb-2 px-4 uppercase tracking-wider">ข้อมูลหลัก</p>
@@ -217,6 +216,11 @@
             <h2 id="currentLayoutTitle" class="font-bold text-base sm:text-lg text-slate-700 truncate">หน้าภาพรวมระบบ</h2>
           </div>
           <div class="flex items-center space-x-3">
+            <button onclick="toggleDarkMode()" class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-700 relative flex items-center px-1 cursor-pointer transition-colors shadow-inner mr-1 sm:mr-2">
+    <div id="darkModeKnob2" class="w-4 h-4 rounded-full bg-white transition-transform transform shadow-sm flex items-center justify-center">
+      <i id="darkModeIcon2" class='bx bx-sun text-[10px] text-amber-500'></i>
+    </div>
+  </button>
             <div class="w-9 h-9 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-sm" id="userAvatarCircle">P</div>
             <div class="text-left hidden sm:block"> <p class="text-sm font-bold text-slate-800 leading-tight" id="headerFullname">พงษ์ศักดิ์ บุนนาค</p>
               <p class="text-xs text-slate-400" id="headerRole">SuperAdmin</p>
@@ -383,7 +387,7 @@
                     </button>
                 </div>
 
-                <div id="calendarGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 auto-rows-[130px] gap-3 sm:gap-4">
+                <div id="calendarGrid" class="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-7 auto-rows-[130px] gap-3 sm:gap-4">
                     </div>
             </div>
           </div>
@@ -797,7 +801,7 @@
   </section>
 
   <div id="otRequestFormModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[90dvh]">
       <div class="p-6 border-b border-slate-100 flex justify-between items-center">
         <h3 class="font-bold text-lg text-slate-800"><i class='bx bx-edit-alt text-blue-500 mr-2'></i>แบบฟอร์มขออนุมัติทำงานล่วงเวลา</h3>
         <button onclick="closeRequestFormModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
@@ -937,7 +941,7 @@
   <script src="app.js"></script>
 
   <div id="deptOTListModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[65] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-fade-in">
+    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-fade-in">
       
       <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-blue-50">
         <div>
