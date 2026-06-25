@@ -873,13 +873,22 @@ function closeRequestFormModal() {
 // 6. ระบบออกจากระบบ (Logout Session Handler)
 // ----------------===================================
 function logoutUsers() {
-    currentUser = null;
-    document.getElementById("dashboardPage").style.display = "none";
-    document.getElementById("pageformLogin").style.display = "flex"; 
-    
-    document.getElementById("loginusername").value = "";
-    document.getElementById("loginpassword").value = "";
-    alert("ออกจากระบบเรียบร้อยแล้วค่ะ👋💕");
+    // ✨ โชว์ SweetAlert ก่อน แล้วค่อยตัดระบบไปหน้า Login
+    Swal.fire({
+        title: 'ออกจากระบบสำเร็จ',
+        text: 'ออกจากระบบเรียบร้อยแล้วค่ะ 👋💕',
+        icon: 'success',
+        confirmButtonText: 'ตกลง',
+        confirmButtonColor: '#3b82f6',
+        timer: 2000 // ตั้งให้ปิดอัตโนมัติใน 2 วินาทีได้ด้วยค่ะ
+    }).then(() => {
+        currentUser = null;
+        document.getElementById("dashboardPage").style.display = "none";
+        document.getElementById("pageformLogin").style.display = "flex"; 
+        
+        document.getElementById("loginusername").value = "";
+        document.getElementById("loginpassword").value = "";
+    });
 }
 
 async function openOTDetailModal(reqId) {
