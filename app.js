@@ -159,6 +159,14 @@ async function loadMyOTDashboardData() {
 
         const { data: otTypes } = await supabaseClient.from('ot_types').select('*');
 
+        // ✨ 1. ดึงข้อมูลสถานะการอนุมัติแต่ละขั้นตอนมาเตรียมไว้เช็ค
+        let allSteps = [];
+        if (requests && requests.length > 0) {
+            const reqIds = requests.map(r => r.id);
+            const { data: stepsData } = await supabaseClient.from('approval_steps').select('request_id, status').in('request_id', reqIds);
+            if (stepsData) allSteps = stepsData;
+        }
+
         const agencyMap = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
         const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
         
@@ -232,7 +240,12 @@ async function loadMyOTDashboardData() {
                 showDate = `${d[2]}/${d[1]}/${d[0]}`; 
             }
 
-            const isDisable = (row.status === 'Approved' || row.status === 'Rejected');
+            // ✨ 2. เช็คว่ามีขั้นตอนไหนถูกพิจารณาไปแล้วหรือยัง (ไม่เป็น Pending)
+        const rowSteps = allSteps.filter(s => s.request_id === row.id);
+        const hasAction = rowSteps.some(s => s.status !== 'Pending');
+        
+        // ถ้าระบบหลักปิดไปแล้ว หรือมีคนเริ่มพิจารณาแล้ว ให้ล็อกปุ่มทันที
+        const isDisable = (row.status === 'Approved' || row.status === 'Rejected' || hasAction);
             
             const btnView = `<button onclick="openOTDetailModal('${row.id}')" class="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm" title="ดูรายละเอียด"><i class='bx bx-show text-lg'></i></button>`;
             
@@ -1091,20 +1104,39 @@ async function bulkApproveSteps(action) {
 }
 
 async function deleteMyOTRequest(reqId) {
-    if (!confirm(`ต้องการลบคำขอโอทีรหัส ${reqId} ใช่ไหมคะ?\n\n⚠️ ลบแล้วไม่สามารถกู้คืนได้นะคะ`)) {
+    // ✨ เช็คก่อนลบ ป้องกันการลบข้อมูลที่กำลังพิจารณา
+    const { data: stepsCheck } = await supabaseClient.from('approval_steps').select('status').eq('request_id', reqId);
+    const hasAction = stepsCheck && stepsCheck.some(s => s.status !== 'Pending');
+    
+    if (hasAction) {
+        Swal.fire('ลบไม่ได้', 'รายการนี้เริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว ไม่สามารถลบได้ค่ะ 😅', 'warning');
         return;
     }
+
+    // ✨ อัปเกรดเป็น SweetAlert2 ให้สวยเข้าชุด
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบคำขอโอทีรหัส ${reqId} ใช่ไหมคะ?\n⚠️ ลบแล้วไม่สามารถกู้คืนได้นะคะ`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
         await supabaseClient.from('approval_steps').delete().eq('request_id', reqId);
         await supabaseClient.from('ot_requests').delete().eq('id', reqId);
         
-        alert("🗑️ ลบรายการสำเร็จแล้วค่ะ!");
+        Swal.fire('สำเร็จ', '🗑️ ลบรายการสำเร็จแล้วค่ะ!', 'success');
         loadMyOTDashboardData(); 
 
     } catch (err) {
         console.error("Delete OT Request Error:", err);
-        alert("เกิดข้อผิดพลาดในการลบข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
     }
 }
 
@@ -1114,8 +1146,12 @@ async function editMyOTRequest(reqId) {
             .from('ot_requests').select('*').eq('id', reqId).single();
         if (reqErr) throw reqErr;
 
-        if (reqData.status === 'Approved' || reqData.status === 'Rejected') {
-            alert('รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅');
+        // ✨ ป้องกันคนหัวหมอแอบส่งคำสั่งแก้: เช็คว่าเริ่มพิจารณาไปแล้วหรือยัง
+        const { data: stepsCheck } = await supabaseClient.from('approval_steps').select('status').eq('request_id', reqId);
+        const hasAction = stepsCheck && stepsCheck.some(s => s.status !== 'Pending');
+
+        if (reqData.status === 'Approved' || reqData.status === 'Rejected' || hasAction) {
+            Swal.fire('แก้ไขไม่ได้', 'รายการนี้เริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅', 'warning');
             return;
         }
 
