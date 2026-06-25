@@ -473,7 +473,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
 
     // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
     if (reasonInput.trim() === "") {
-        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะพี่ต้น`);
+        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะ`);
         return; // หยุดการทำงานทันที
     }
 
@@ -493,7 +493,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
             await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
         }
 
-        alert("ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะพี่ต้น! 🎉");
+        alert("ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะ! 🎉");
         loadApprovalQueueData();
 
     } catch (err) {
@@ -947,7 +947,7 @@ async function bulkApproveSteps(action) {
     const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
     
     if (checkboxes.length === 0) {
-        alert("พี่ต้นยังไม่ได้เลือกรายการที่ต้องการดำเนินการเลยค่ะ 😅 ติ๊กถูกข้างหน้าก่อนน้า");
+        alert("ยังไม่ได้เลือกรายการที่ต้องการดำเนินการเลยค่ะ 😅 ติ๊กถูกข้างหน้าก่อนค่ะ");
         return;
     }
 
@@ -959,7 +959,7 @@ async function bulkApproveSteps(action) {
 
     // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
     if (reasonInput.trim() === "") {
-        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะพี่ต้น`);
+        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะ`);
         return; // หยุดการทำงานทันที
     }
 
@@ -986,7 +986,7 @@ async function bulkApproveSteps(action) {
             }
         }
 
-        alert(`✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะพี่ต้น!`);
+        alert(`✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะ!`);
         const selectAllCb = document.getElementById('selectAllCheckbox');
         if (selectAllCb) selectAllCb.checked = false;
         loadApprovalQueueData();
