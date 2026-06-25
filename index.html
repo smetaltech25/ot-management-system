@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจัดการโอที OverTime Management System</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  
+  <style>
+    body { font-family: 'Prompt', sans-serif; }
+    .active-menu { @apply bg-blue-50 text-blue-600 font-semibold; }
+    /* =========================================
+       ✨ Dark Mode Global Overrides ✨
+       (เปลี่ยนสีทั้งระบบอัตโนมัติ โดยไม่ต้องแก้ HTML)
+       ========================================= */
+       
+    /* สีพื้นหลังหลักของหน้าเว็บ */
+    html.dark body { background-color: #1f2233 !important; color: #f1f5f9 !important; }
+    
+    /* สีพื้นหลังการ์ด, แถบเมนู และ Modal */
+    html.dark .bg-white { background-color: #2a2d3e !important; }
+    html.dark .bg-slate-50 { background-color: #1f2233 !important; }
+    html.dark .bg-slate-100 { background-color: #3f445e !important; }
+    html.dark .bg-slate-200 { background-color: #4b5563 !important; }
+    
+    /* สีของเส้นขอบ (Borders) */
+    html.dark .border-slate-100, 
+    html.dark .border-slate-200, 
+    html.dark .border-slate-300 { border-color: #3f445e !important; }
+    html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #3f445e !important; }
+    
+    /* สีของตัวอักษรต่างๆ */
+    html.dark .text-slate-800, 
+    html.dark .text-slate-700 { color: #f8fafc !important; }
+    html.dark .text-slate-600 { color: #e2e8f0 !important; }
+    html.dark .text-slate-500, 
+    html.dark .text-slate-400 { color: #94a3b8 !important; }
+    
+    /* สีของหัวตาราง (Table Header) และเอฟเฟกต์ตอนชี้เมาส์ */
+    html.dark th.bg-slate-50 { background-color: #3f445e !important; color: #f8fafc !important; border-bottom-color: #4b5563 !important; }
+    html.dark tr.hover\:bg-slate-50:hover { background-color: #3f445e !important; }
+    
+    /* สีของช่องกรอกข้อมูล (Inputs, Selects, Textareas) */
+    html.dark input:not([type="checkbox"]):not([type="radio"]), 
+    html.dark select, 
+    html.dark textarea { 
+        background-color: #1f2233 !important; 
+        color: #f8fafc !important; 
+        border-color: #4b5563 !important; 
+    }
+    
+    /* สีของเมนูด้านข้าง (Sidebar Menu) */
+    html.dark aside nav button { color: #cbd5e1 !important; }
+    html.dark aside nav button:hover { background-color: #3f445e !important; color: #60a5fa !important; }
+    html.dark aside nav button.active-menu { background-color: rgba(59, 130, 246, 0.15) !important; color: #60a5fa !important; }
+    
+    /* เงาและการ์ดในหน้าปฏิทิน */
+    html.dark .group\/cell:hover { border-color: #60a5fa !important; }
+
+
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <section class="auth-page flex items-center justify-center min-h-screen p-4 transition-colors duration-300 bg-slate-50 dark:bg-[#1f2233]" id="pageformLogin">
+    <div class="w-full max-w-md bg-white dark:bg-[#2a2d3e] rounded-xl shadow-xl p-8 border border-slate-100 dark:border-transparent relative transition-colors duration-300">
+      
+      <div class="absolute top-5 right-5">
+        <button onclick="toggleDarkMode()" class="w-12 h-6 rounded-full bg-slate-200 dark:bg-blue-500 relative flex items-center px-1 cursor-pointer transition-colors shadow-inner">
+          <div id="darkModeKnob" class="w-4 h-4 rounded-full bg-white absolute left-1 transition-transform transform shadow-sm flex items-center justify-center">
+            <i id="darkModeIcon" class='bx bx-sun text-[10px] text-amber-500'></i>
+          </div>
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-3 mb-8 mt-2">
+        <img src="https://hperamyypofcxajmrskq.supabase.co/storage/v1/object/public/avatars/LOGO.jpg" alt="SMT Logo" class="w-14 h-14 object-contain rounded-md bg-white p-1">
+        <h1 class="text-[17px] font-bold text-slate-800 dark:text-white leading-tight">OverTime Management System<br>(OMS)</h1>
+      </div>
+
+      <h2 class="text-xl font-bold text-center text-slate-800 dark:text-white mb-6">เข้าสู่ระบบ</h2>
+
+      <form id="formLogin" class="space-y-5">
+        <div>
+          <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">อีเมลหรือชื่อผู้ใช้</label>
+          <input type="text" id="loginusername" class="w-full p-3 bg-slate-50 dark:bg-[#eff4ff] border border-slate-200 dark:border-transparent rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium transition-colors" placeholder="Pongsak">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">รหัสผ่าน</label>
+          <div class="relative">
+            <input type="password" id="loginpassword" class="w-full p-3 bg-slate-50 dark:bg-[#eff4ff] border border-slate-200 dark:border-transparent rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium pr-10 transition-colors" placeholder="••••••••">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-blue-500 transition-colors">
+              <i id="eyeIcon" class='bx bx-show text-lg'></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="flex items-center cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" class="sr-only peer">
+              <div class="w-8 h-4 bg-slate-300 dark:bg-slate-500 rounded-full peer-checked:bg-blue-500 transition-colors"></div>
+              <div class="absolute left-0.5 top-0.5 bg-white w-3 h-3 rounded-full transition-transform transform peer-checked:translate-x-4 shadow-sm"></div>
+            </div>
+            <span class="ml-2 text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-slate-800 dark:group-hover:text-white transition-colors">จดจำรหัสผ่าน</span>
+          </label>
+          <a href="#" onclick="alert('กรุณาติดต่อฝ่ายบุคคล'); return false;" class="text-sm font-medium text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">ลืมรหัสผ่าน?</a>
+        </div>
+
+        <button type="button" onclick="loginUsersSupabase()" class="w-full py-3 mt-2 bg-[#3b82f6] text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all hover:-translate-y-0.5">
+          เข้าสู่ระบบ
+        </button>
+
+        <p class="text-center text-sm font-medium text-slate-500 dark:text-slate-400 mt-6">
+  ยังไม่มีบัญชีใช่ไหม? <a href="#" onclick="alert('กรุณาติดต่อฝ่ายบุคคล'); return false;" class="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">สมัครสมาชิก</a>
+</p>
+      </form>
+    </div>
+  </section>
+
+  <section id="dashboardPage" style="display:none">
+    <div class="flex h-screen w-full overflow-hidden relative">
+      
+      <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-[40] hidden sm:hidden"></div>
+
+      <aside id="mainSidebar" class="w-64 bg-white border-r border-slate-100 flex flex-col justify-between flex-shrink-0 absolute inset-y-0 left-0 transform -translate-x-full sm:relative sm:translate-x-0 transition-transform duration-300 ease-in-out z-[50]">
+        <div>
+          <div class="p-6 border-b border-slate-50 flex items-center justify-between sm:justify-start space-x-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-gradient-to-tr from-blue-600 to-sky-400 rounded-xl flex items-center justify-center text-white text-xl shadow-md">
+                <i class='bx bxs-time-five'></i>
+              </div>
+              <span class="font-bold text-lg text-slate-800">OMS Dashboard</span>
+            </div>
+            <button onclick="toggleMobileMenu()" class="sm:hidden text-slate-400 hover:text-red-500 text-2xl">
+              <i class='bx bx-x'></i>
+            </button>
+          </div>
+          
+          <nav class="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-160px)]">
+            <p class="text-xs font-bold text-slate-400 mt-2 mb-2 px-4 uppercase tracking-wider">ข้อมูลหลัก</p>
+            <button onclick="changePage(1)" id="menuTab1" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active-menu">
+              <i class='bx bxs-home mr-3 text-xl'></i> หน้าแรก
+            </button>
+            <button onclick="changePage(2)" id="menuTab2" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+              <i class='bx bx-file mr-3 text-xl'></i> การขออนุญาต
+            </button>
+            <button onclick="changePage(3)" id="menuTab3" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+              <i class='bx bxs-calendar mr-3 text-xl'></i> ปฏิทิน OT
+            </button>
+            <button onclick="changePage(5)" id="menuTab5" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+              <i class='bx bxs-file-find mr-3 text-xl'></i> รายงาน
+            </button>
+
+            <div id="adminMenuSection" style="display: none;" class="animate-fade-in pt-2">
+              <p class="text-xs font-bold text-slate-400 mt-4 mb-2 px-4 uppercase tracking-wider">ผู้ใช้งาน</p>
+              <button onclick="changePage(6)" id="menuTab6" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-user-account mr-3 text-xl'></i> ผู้ใช้งานระบบ
+              </button>
+              <button onclick="changePage(10)" id="menuTab10" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-shield-plus mr-3 text-xl'></i> สิทธิการใช้งาน
+              </button>
+              <p class="text-xs font-bold text-slate-400 mt-6 mb-2 px-4 uppercase tracking-wider">ตั้งค่าระบบ</p>
+              <button onclick="changePage(7)" id="menuTab7" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-buildings mr-3 text-xl'></i> ตั้งค่าหน่วยงาน
+              </button>
+              <button onclick="changePage(8)" id="menuTab8" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-group mr-3 text-xl'></i> ตั้งค่าฝ่าย
+              </button>
+              <button onclick="changePage(9)" id="menuTab9" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-time-five mr-3 text-xl'></i> ตั้งค่าโอที
+              </button>
+              <button onclick="changePage(11)" id="menuTab11" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-calendar-x mr-3 text-xl'></i> ตั้งค่าวันหยุด
+              </button>
+              <button onclick="changePage(12)" id="menuTab12" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-calendar-check mr-3 text-xl'></i> ตั้งค่าวันทำงาน
+              </button>
+              <button onclick="changePage(13)" id="menuTab13" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all">
+                <i class='bx bxs-cog mr-3 text-xl'></i> ตั้งค่าระบบ
+              </button>
+            </div>
+          </nav>
+        </div>
+        <div class="p-4 border-t border-slate-50">
+          <button onclick="logoutUsers()" class="w-full flex items-center justify-center px-4 py-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl font-medium transition-all">
+            <i class='bx bx-log-out mr-2 text-xl'></i> ออกจากระบบ
+          </button>
+        </div>
+      </aside>
+
+      <div class="flex-1 flex flex-col overflow-hidden bg-slate-50 w-full">
+        
+        <header class="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-8 flex-shrink-0 w-full">
+          <div class="flex items-center">
+            <button onclick="toggleMobileMenu()" class="mr-3 sm:hidden p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <i class='bx bx-menu text-2xl'></i>
+            </button>
+            <h2 id="currentLayoutTitle" class="font-bold text-base sm:text-lg text-slate-700 truncate">หน้าภาพรวมระบบ</h2>
+          </div>
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-sm" id="userAvatarCircle">P</div>
+            <div class="text-left hidden sm:block"> <p class="text-sm font-bold text-slate-800 leading-tight" id="headerFullname">พงษ์ศักดิ์ บุนนาค</p>
+              <p class="text-xs text-slate-400" id="headerRole">SuperAdmin</p>
+            </div>
+          </div>
+        </header>
+
+        <main class="flex-1 p-8 overflow-y-auto">
+          
+          <div id="page1" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="bg-white p-6 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm">
+                <div>
+                  <p class="text-slate-400 text-sm font-medium mb-1">คำขอที่รออนุมัติ</p>
+                  <h3 class="text-2xl font-bold text-slate-800" id="statPendingCount">0 รายการ</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center text-2xl"><i class='bx bx-time'></i></div>
+              </div>
+              <div class="bg-white p-6 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm">
+                <div>
+                  <p class="text-slate-400 text-sm font-medium mb-1">อนุมัติแล้วเดือนนี้</p>
+                  <h3 class="text-2xl font-bold text-slate-800" id="statApprovedCount">0 รายการ</h3>
+                </div>
+                <div class="w-12 h-12 bg-green-50 text-green-500 rounded-xl flex items-center justify-center text-2xl"><i class='bx bx-check-circle'></i></div>
+              </div>
+              <div class="bg-white p-6 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm">
+                <div>
+                  <p class="text-slate-400 text-sm font-medium mb-1">รวมชั่วโมง OT ทั้งหมด</p>
+                  <h3 class="text-2xl font-bold text-blue-600" id="statTotalHours">0 ชม.</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-2xl"><i class='bx bx-stopwatch'></i></div>
+              </div>
+            </div>
+
+            <div id="myOTChartsSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 hidden">
+              <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="font-bold text-slate-800 text-lg">สถิติประเภท OT</h3>
+                </div>
+                <div class="relative h-64 w-full">
+                  <canvas id="otBarChart"></canvas>
+                </div>
+              </div>
+              
+              <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="font-bold text-slate-800 text-lg">สัดส่วน OT</h3>
+                </div>
+                <div class="relative h-64 w-full flex justify-center">
+                  <canvas id="otDoughnutChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm mt-6">
+              <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                  <h3 class="font-bold text-slate-800 text-lg w-full sm:w-auto">รายการคำขอทั้งหมด</h3>
+                  <div class="flex items-center gap-3 w-full sm:w-auto">
+                      
+                      <button onclick="loadMyOTDashboardData()" class="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md whitespace-nowrap flex items-center" title="อัปเดตข้อมูลล่าสุด">
+                          <i class='bx bx-refresh text-xl mr-1'></i> รีโหลด
+                      </button>
+
+                      <div class="relative flex-grow sm:flex-grow-0">
+    <input type="text" id="searchInput" onkeyup="searchOTRequests()" placeholder="ค้นหาคำขอ (รหัส, ชื่อ, สถานะ)..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-colors">
+    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+</div>
+                      <button onclick="openRequestFormModal()" class="px-5 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors shadow-md whitespace-nowrap flex items-center">
+                          ขออนุญาต
+                      </button>
+                  </div>
+              </div>
+              
+              <div class="overflow-x-auto rounded-xl border border-slate-100">
+                  <table class="w-full text-sm text-left whitespace-nowrap">
+                      <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+    <tr>
+        <th class="p-4 text-center w-12">
+            <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllCheckboxes(this)" class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
+        </th>
+        <th class="p-4 text-center">รหัส</th>
+        <th class="p-4">พนักงาน</th>
+        <th class="p-4 text-center">ประเภท</th>
+        <th class="p-4 text-center">วันที่</th>
+        <th class="p-4 text-center">เวลา</th>
+        <th class="p-4 text-center">เหตุผล</th>
+        <th class="p-4 text-center">สถานะ</th>
+        <th class="p-4 text-center">จัดการ</th>
+    </tr>
+</thead>
+                      <tbody id="myOTRequestsTableBody" class="divide-y divide-slate-100">
+                          </tbody>
+                  </table>
+              </div>
+              
+              <div class="mt-6 flex flex-col items-center justify-center gap-3">
+                  <span class="text-sm text-slate-500" id="paginationInfoText">แสดง 0 ถึง 0 จาก 0 แถว</span>
+                  <div class="flex items-center gap-1">
+                      <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50"><i class='bx bx-chevrons-left'></i></button>
+                      <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50"><i class='bx bx-chevron-left'></i></button>
+                      <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-green-500 text-white font-bold shadow-sm">1</button>
+                      <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50"><i class='bx bx-chevron-right'></i></button>
+                      <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50"><i class='bx bx-chevrons-right'></i></button>
+                  </div>
+              </div>
+            </div>
+          </div>
+          <!-- ================= หน้าที่ 2: รายการขออนุญาต (รออนุมัติ) ================= -->
+          <div id="page2" style="display:none" class="space-y-6 animate-fade-in">
+            <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+    <h3 class="font-bold text-slate-800 text-lg w-full sm:w-auto">รายการรออนุมัติ OT</h3>
+    
+    <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button onclick="loadApprovalQueueData()" class="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center">
+            <i class='bx bx-refresh mr-2'></i> รีโหลดข้อมูล
+        </button>
+        <button onclick="bulkApproveSteps('Approved')" class="px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center">
+            <i class='bx bx-check mr-2'></i> อนุมัติที่เลือก
+        </button>
+        <button onclick="bulkApproveSteps('Rejected')" class="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center">
+            <i class='bx bx-x mr-2'></i> ไม่อนุมัติที่เลือก
+        </button>
+    </div>
+</div>
+
+<div class="overflow-x-auto rounded-xl border border-slate-100">
+    <table class="w-full text-sm text-left whitespace-nowrap">
+        <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+    <tr>
+        <th class="p-4 text-center w-12">
+            <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllCheckboxes(this)" class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
+        </th>
+        <th class="p-4 text-center">รหัส</th>
+        <th class="p-4">พนักงาน</th>
+        <th class="p-4 text-center">ประเภท</th>
+        <th class="p-4 text-center">วันที่</th>
+        <th class="p-4 text-center">เวลา</th>
+        <th class="p-4 text-center">เหตุผล</th>
+        <th class="p-4 text-center">สถานะ</th>
+        <th class="p-4 text-center">จัดการ</th>
+    </tr>
+</thead>
+                      <tbody id="approvalQueueTableBody" class="divide-y divide-slate-100">
+                          <!-- 🌟 สคริปต์ JavaScript จะดึงแถวข้อมูลมาแทรกตรงนี้อัตโนมัติค่ะ 🌟 -->
+                      </tbody>
+                  </table>
+              </div>
+            </div>
+          </div>
+          <!-- ================= สิ้นสุดหน้าที่ 2 ================= -->
+
+          <div id="page3" style="display:none" class="space-y-6 animate-fade-in">
+            <div class="bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm">
+                <div class="flex justify-between items-center mb-8">
+                    <button onclick="changeCalendarMonth(-1)" class="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md flex items-center transition-all hover:-translate-y-0.5">
+                        <i class='bx bx-chevron-left text-xl mr-1'></i> <span class="hidden sm:inline">เดือนก่อนหน้า</span>
+                    </button>
+                    
+                    <h2 id="calendarMonthYear" class="text-2xl sm:text-3xl font-bold text-slate-800 text-center flex-1">มกราคม 2569</h2>
+                    
+                    <button onclick="changeCalendarMonth(1)" class="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md flex items-center transition-all hover:-translate-y-0.5">
+                        <span class="hidden sm:inline">เดือนถัดไป</span> <i class='bx bx-chevron-right text-xl ml-1'></i>
+                    </button>
+                </div>
+
+                <div id="calendarGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 auto-rows-[130px] gap-3 sm:gap-4">
+                    </div>
+            </div>
+          </div>
+          <div id="page5" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-100 pb-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-file-find text-blue-500 text-2xl mr-2'></i> รายงานการขอทำงานล่วงเวลา (OT Reports)
+            </h3>
+            <button onclick="exportToExcel()" class="px-5 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                <i class='bx bx-export text-lg mr-2'></i> Export (.xlsx)
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">ตั้งแต่วันที่</label>
+                <input type="date" id="reportStartDate" onchange="filterReports()" class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm cursor-pointer">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">ถึงวันที่</label>
+                <input type="date" id="reportEndDate" onchange="filterReports()" class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm cursor-pointer">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">ฝ่าย (Department)</label>
+                <select id="reportDept" onchange="filterReports()" class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm cursor-pointer">
+                    <option value="">ทั้งหมด (All)</option>
+                    </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">สถานะ (Status)</label>
+                <select id="reportStatus" onchange="filterReports()" class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm cursor-pointer">
+                    <option value="">ทั้งหมด (All)</option>
+                    <option value="Approved" selected>อนุมัติแล้ว (Approved)</option>
+                    <option value="Pending">รอพิจารณา (Pending)</option>
+                    <option value="Rejected">ไม่อนุมัติ (Rejected)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">ค้นหาชื่อพนักงาน</label>
+                <input type="text" id="reportSearch" onkeyup="filterReports()" placeholder="พิมพ์ชื่อเพื่อค้นหา..." class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+                <div>
+                    <p class="text-blue-600 text-xs font-bold mb-1">จำนวนคำขอทั้งหมด</p>
+                    <h4 class="text-2xl font-bold text-blue-800" id="reportTotalReq">0</h4>
+                </div>
+                <i class='bx bx-file text-3xl text-blue-200'></i>
+            </div>
+            <div class="bg-green-50 p-4 rounded-xl border border-green-100 flex items-center justify-between">
+                <div>
+                    <p class="text-green-600 text-xs font-bold mb-1">อนุมัติแล้ว (รายการ)</p>
+                    <h4 class="text-2xl font-bold text-green-800" id="reportTotalApproved">0</h4>
+                </div>
+                <i class='bx bx-check-circle text-3xl text-green-200'></i>
+            </div>
+            <div class="bg-amber-50 p-4 rounded-xl border border-amber-100 flex items-center justify-between">
+                <div>
+                    <p class="text-amber-600 text-xs font-bold mb-1">ชั่วโมงโอทีอนุมัติแล้ว (ชม.)</p>
+                    <h4 class="text-2xl font-bold text-amber-800" id="reportTotalHours">0.00</h4>
+                </div>
+                <i class='bx bx-time text-3xl text-amber-200'></i>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-3 text-center">วันที่ทำ OT</th>
+                        <th class="p-3 text-center">รหัสคำขอ</th>
+                        <th class="p-3">ชื่อพนักงาน</th>
+                        <th class="p-3 text-center">ฝ่าย</th>
+                        <th class="p-3 text-center">เหตุผล</th> 
+                        <th class="p-3 text-center">ช่วงเวลา</th>
+                        <th class="p-3 text-center text-blue-600">ชั่วโมง</th>
+                        <th class="p-3 text-center">สถานะ</th>
+                        <th class="p-3 text-center">จัดการ</th> 
+                    </tr>
+                </thead>
+                <tbody id="reportsTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+          <div id="page6" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-user-account text-blue-500 text-2xl mr-2'></i> จัดการผู้ใช้งานระบบ
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-grow sm:flex-grow-0">
+                    <input type="text" id="searchUserInput" onkeyup="searchTable('searchUserInput', 'usersTableBody')" placeholder="ค้นหาชื่อ, แผนก, สิทธิ์..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-colors">
+                    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+                </div>
+                <button onclick="openUserModal()" class="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มผู้ใช้งาน
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 text-center w-28">รหัสพนักงาน (ID)</th>
+                        <th class="p-4">พนักงาน (Username)</th>
+                        <th class="p-4 text-center">สิทธิ์การใช้งาน</th>
+                        <th class="p-4 text-center">หน่วยงาน / ฝ่าย</th>
+                        <th class="p-4 text-center">สถานะ</th>
+                        <th class="p-4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div id="page7" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-4xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-buildings text-indigo-500 text-2xl mr-2'></i> จัดการหน่วยงาน (Agency)
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-grow sm:flex-grow-0">
+                    <input type="text" id="searchAgencyInput" onkeyup="searchTable('searchAgencyInput', 'agenciesTableBody')" placeholder="ค้นหารหัส หรือ ชื่อหน่วยงาน..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors">
+                    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+                </div>
+                <button onclick="openAgencyModal()" class="px-4 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มหน่วยงาน
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 w-1/4 text-center">รหัสหน่วยงาน (ID)</th>
+                        <th class="p-4 w-2/4">ชื่อหน่วยงาน (Agency Name)</th>
+                        <th class="p-4 w-1/4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="agenciesTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+          <div id="page8" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-4xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-group text-teal-500 text-2xl mr-2'></i> จัดการฝ่าย (Departments)
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-grow sm:flex-grow-0">
+                    <input type="text" id="searchDeptInput" onkeyup="searchTable('searchDeptInput', 'deptsTableBody')" placeholder="ค้นหารหัส หรือ ชื่อฝ่าย..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500 transition-colors">
+                    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+                </div>
+                <button onclick="openDeptModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มฝ่าย
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 w-1/4 text-center">รหัสฝ่าย (ID)</th>
+                        <th class="p-4 w-2/4">ชื่อฝ่าย (Department Name)</th>
+                        <th class="p-4 w-1/4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="deptsTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div id="page11" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-5xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-calendar-star text-rose-500 text-2xl mr-2'></i> จัดการวันหยุดบริษัท (Holidays)
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-grow sm:flex-grow-0">
+                    <input type="text" id="searchHolidayInput" onkeyup="searchTable('searchHolidayInput', 'holidaysTableBody')" placeholder="ค้นหาวันที่, ชื่อวันหยุด..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors">
+                    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+                </div>
+                <button onclick="openHolidayModal()" class="px-4 py-2.5 bg-rose-500 text-white rounded-xl text-sm font-semibold hover:bg-rose-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มวันหยุด
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 text-center">รหัส (ID)</th>
+                        <th class="p-4 text-center">วันที่ (DD/MM/YYYY)</th>
+                        <th class="p-4">รายละเอียดวันหยุด</th>
+                        <th class="p-4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="holidaysTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+          <div id="page9" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-5xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-time-five text-orange-500 text-2xl mr-2'></i> จัดการเวลาและเรตโอที
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative flex-grow sm:flex-grow-0">
+                    <input type="text" id="searchOTTypeInput" onkeyup="searchTable('searchOTTypeInput', 'otTypesTableBody')" placeholder="ค้นหาเวลา, เรตโอที..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500 transition-colors">
+                    <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
+                </div>
+                <button onclick="openOTTypeModal()" class="px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มเวลาโอที
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 text-center">รหัส (ID)</th>
+                        <th class="p-4 text-center">เวลาเริ่มต้น (Start)</th>
+                        <th class="p-4 text-center">เวลาสิ้นสุด (End)</th>
+                        <th class="p-4 text-center">เรตโอที (ตัวคูณ)</th>
+                        <th class="p-4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="otTypesTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div id="page12" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-4xl mx-auto">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-calendar-check text-emerald-500 text-2xl mr-2'></i> จัดการวันทำงานประจำสัปดาห์
+            </h3>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <button onclick="openWorkdayModal()" class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                    <i class='bx bx-plus text-lg mr-1'></i> เพิ่มข้อมูลวัน
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 text-center w-24">ลำดับวัน</th>
+                        <th class="p-4">ชื่อวัน (Day Name)</th>
+                        <th class="p-4 text-center">สถานะการทำงาน</th>
+                        <th class="p-4 text-center w-24">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="workdaysTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div id="workdayFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+            <h3 class="font-bold text-lg text-emerald-800" id="workdayModalTitle"><i class='bx bxs-calendar-check mr-2'></i>เพิ่มวันทำงาน</h3>
+            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formWdOldName">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="col-span-1">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">ลำดับวัน</label>
+                    <input type="number" id="formWdNumber" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" placeholder="เช่น 1">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">ชื่อวัน (Day Name)</label>
+                    <input type="text" id="formWdName" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" placeholder="เช่น Monday">
+                </div>
+            </div>
+            <div class="flex items-center space-x-3 mt-4 pt-4 border-t border-slate-100">
+                <label class="text-sm font-bold text-slate-700">เป็นวันทำงานปกติหรือไม่?</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="formWdIsWorking" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeWorkdayModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveWorkdayData()" class="px-5 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+          <div id="page10" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-5xl mx-auto">
+        <div class="mb-6">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-shield-plus text-purple-500 text-2xl mr-2'></i> ระดับสิทธิการใช้งานระบบ (Role Permissions)
+            </h3>
+            <p class="text-sm text-slate-500 mt-1">ตารางสรุปการเข้าถึงเมนูและฟังก์ชันต่างๆ ของแต่ละระดับสิทธิ์</p>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                        <th class="p-4 w-1/4">ระดับสิทธิ์ (Role)</th>
+                        <th class="p-4 w-2/4">คำอธิบายและหน้าที่</th>
+                        <th class="p-4 text-center w-1/4">การเข้าถึงเมนู</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4">
+                            <span class="text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100"><i class='bx bxs-crown mr-1'></i>SuperAdmin</span>
+                        </td>
+                        <td class="p-4 text-slate-600">ผู้ดูแลระบบสูงสุด, ฝ่าย HR<br><span class="text-[11px] text-slate-400">อนุมัติคำขอลำดับ 3, จัดการข้อมูลผู้ใช้, ตั้งค่าระบบทั้งหมด</span></td>
+                        <td class="p-4 text-center text-xs font-bold text-slate-500">เข้าถึงได้ <span class="text-purple-600">ทุกเมนู</span></td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4">
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"><i class='bx bxs-briefcase mr-1'></i>Admin</span>
+                        </td>
+                        <td class="p-4 text-slate-600">ผู้จัดการฝ่าย, ผู้จัดการแผนก<br><span class="text-[11px] text-slate-400">อนุมัติคำขอลำดับ 2, ดูรายงานโอทีภาพรวมได้</span></td>
+                        <td class="p-4 text-center text-xs font-bold text-slate-500">หน้าแรก, ขออนุมัติ, ปฏิทิน, รายงาน</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4">
+                            <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100"><i class='bx bxs-user-check mr-1'></i>SuperUser</span>
+                        </td>
+                        <td class="p-4 text-slate-600">หัวหน้างาน, Leader<br><span class="text-[11px] text-slate-400">อนุมัติคำขอลำดับ 1, ตรวจสอบการทำงานของคนในทีม</span></td>
+                        <td class="p-4 text-center text-xs font-bold text-slate-500">หน้าแรก, ขออนุมัติ, ปฏิทิน, รายงาน</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4">
+                            <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200"><i class='bx bxs-user mr-1'></i>User</span>
+                        </td>
+                        <td class="p-4 text-slate-600">พนักงานทั่วไป<br><span class="text-[11px] text-slate-400">ยื่นแบบฟอร์มขอทำ OT, ดูประวัติการขอ OT ของตนเอง</span></td>
+                        <td class="p-4 text-center text-xs font-bold text-slate-500">หน้าแรก, ปฏิทิน</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div id="page13" style="display:none" class="space-y-6 animate-fade-in">
+    <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-3xl mx-auto">
+        <div class="mb-6 border-b border-slate-100 pb-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class='bx bxs-cog text-slate-600 text-2xl mr-2'></i> ตั้งค่าระบบพื้นฐาน (System Settings)
+            </h3>
+            <p class="text-sm text-slate-500 mt-1">ตั้งค่าชื่อระบบและข้อมูลการเชื่อมต่อต่างๆ</p>
+        </div>
+
+        <div class="space-y-5">
+            <input type="hidden" id="settingRecordId">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">ชื่อระบบ (System Name)</label>
+                    <input type="text" id="setSystemName" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-colors" placeholder="เช่น OverTime Management System">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">ชื่อบริษัท (Company Name)</label>
+                    <input type="text" id="setCompanyName" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-colors" placeholder="ระบุชื่อบริษัทของคุณ">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center">
+                    <i class='bx bxl-bootstrap text-green-500 text-lg mr-1'></i> LINE Notify Token (สำหรับส่งแจ้งเตือน)
+                </label>
+                <input type="password" id="setLineToken" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 transition-colors font-mono text-sm" placeholder="วาง Token จาก LINE Notify ที่นี่...">
+                <p class="text-[11px] text-slate-400 mt-1.5">* เว้นว่างไว้หากยังไม่ต้องการเปิดใช้งานระบบแจ้งเตือนผ่านไลน์</p>
+            </div>
+
+            <div class="pt-6 flex justify-end">
+                <button onclick="saveSystemSettings()" class="px-6 py-3 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center hover:-translate-y-0.5 duration-200">
+                    <i class='bx bx-save text-lg mr-2'></i> บันทึกการตั้งค่าระบบ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <div id="otRequestFormModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-800"><i class='bx bx-edit-alt text-blue-500 mr-2'></i>แบบฟอร์มขออนุมัติทำงานล่วงเวลา</h3>
+        <button onclick="closeRequestFormModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+      </div>
+      
+      <div class="p-6 space-y-5 overflow-y-auto flex-1">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">วันที่ทำโอที</label>
+          <input type="date" id="reqDateStart" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">ช่วงเวลาและเรตโอที</label>
+          <div id="otTypeContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+             </div>
+          <input type="hidden" id="reqOtType" value="">
+          <input type="hidden" id="reqEditId" value=""> <!-- ✅ เพิ่มบรรทัดนี้เข้าไปค่ะ -->
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">เหตุผลการขอทำงานล่วงเวลา</label>
+          <textarea id="reqDescription" rows="3" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="ระบุรายละเอียดงาน..."></textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">ผู้อนุมัติ (ลำดับ 1 -> 2 -> 3)</label>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-start gap-3">
+            <button type="button" onclick="openApproverModal()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-sm">
+              <i class='bx bx-user-plus'></i> เลือกผู้อนุมัติ
+            </button>
+            <div id="selected-approvers" class="flex flex-wrap gap-2 w-full mt-1">
+               <span class="text-sm text-slate-400 italic">ยังไม่ได้เลือกผู้อนุมัติ...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-white border-t border-slate-100 flex justify-end space-x-2">
+        <button onclick="closeRequestFormModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+        <button onclick="submitOTRequestSupabase()" class="px-5 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md">ส่งคำขออนุมัติ 🚀</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="approverModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl w-full max-w-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h3 class="font-bold text-lg text-slate-800">เลือกผู้อนุมัติ <span class="text-sm font-normal text-slate-500">(เลือกตามลำดับ 1, 2, 3)</span></h3>
+        <button onclick="closeApproverModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+      </div>
+      
+      <div id="approver-list-container" class="p-6 overflow-y-auto bg-white flex-1">
+         </div>
+      
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+        <button onclick="closeApproverModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+        <button onclick="confirmApproverSelection()" class="px-6 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 shadow-md">ยืนยันการเลือก</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="otDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-fade-in">
+        
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-xl text-slate-800">รายละเอียดคำขอ OT</h3>
+            <button onclick="closeOTDetailModal()" class="text-slate-400 hover:text-red-500 text-2xl transition-colors">&times;</button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+            
+            <div id="modalLoading" class="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center hidden">
+                <i class='bx bx-loader-alt bx-spin text-4xl text-blue-500 mb-2'></i>
+                <p class="text-slate-500 font-medium">กำลังโหลดข้อมูล...</p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex items-center space-x-4 mb-6">
+                    <div class="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden shadow-sm">
+                        <img id="modalEmpImage" src="" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <h4 id="modalEmpName" class="font-bold text-lg text-slate-800">-</h4>
+                        <p id="modalEmpDept" class="text-sm text-slate-500">-</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 text-sm border-b border-slate-100 pb-3">
+                    <div class="text-slate-500">รหัสคำขอ:</div>
+                    <div id="modalReqId" class="col-span-2 font-semibold text-slate-800">-</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-sm border-b border-slate-100 pb-3">
+                    <div class="text-slate-500">วันที่ทำ OT:</div>
+                    <div id="modalDate" class="col-span-2 font-semibold text-slate-800">-</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-sm border-b border-slate-100 pb-3">
+                    <div class="text-slate-500">ช่วงเวลา:</div>
+                    <div id="modalTime" class="col-span-2 font-semibold text-slate-800">-</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-sm border-b border-slate-100 pb-3">
+                    <div class="text-slate-500">เหตุผล:</div>
+                    <div id="modalDesc" class="col-span-2 text-slate-800">-</div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-sm pb-3">
+                    <div class="text-slate-500">สถานะหลัก:</div>
+                    <div id="modalStatusBadge" class="col-span-2">-</div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-blue-500 text-white rounded-lg flex items-center justify-center text-xl">
+                            <i class='bx bx-briefcase'></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-bold">เรตโอที</p>
+                            <p id="modalRate" class="font-bold text-slate-800 text-sm">-</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-500 font-bold">รวมชั่วโมง</p>
+                        <p id="modalTotalHours" class="font-bold text-blue-600 text-xl">-</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-slate-700 mb-4 flex items-center"><i class='bx bx-git-commit text-purple-500 mr-2 text-xl'></i> เส้นทางการอนุมัติ</h4>
+                    <div id="modalTimeline" class="space-y-4">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+
+  <div id="deptOTListModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[65] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-fade-in">
+      
+      <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-blue-50">
+        <div>
+            <h3 class="font-bold text-lg text-blue-800 flex items-center">
+                <i class='bx bxs-buildings mr-2 text-xl'></i> <span id="modalDeptTitle">ฝ่าย...</span>
+            </h3>
+            <p class="text-sm text-blue-600 mt-0.5" id="modalDeptCount">0 คำขอ</p>
+        </div>
+        <button onclick="closeDeptOTListModal()" class="text-slate-400 hover:text-red-500 text-2xl transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-12 gap-2 p-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
+          <div class="col-span-5 text-left pl-2">พนักงาน</div>
+          <div class="col-span-3">ช่วงเวลา</div>
+          <div class="col-span-2">สถานะ</div>
+          <div class="col-span-2">จัดการ</div>
+      </div>
+
+      <div id="deptOTListContainer" class="p-2 overflow-y-auto flex-1 bg-white space-y-1 custom-scrollbar">
+          </div>
+      
+    </div>
+  </div>
+
+  <div id="userFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-blue-50">
+            <h3 class="font-bold text-lg text-blue-800" id="userModalTitle"><i class='bx bxs-user-detail mr-2'></i>เพิ่มผู้ใช้งานใหม่</h3>
+            <button onclick="closeUserModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formUserId">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Username (รหัสพนักงาน)</label>
+                    <input type="text" id="formUsername" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Password</label>
+                    <input type="text" id="formPassword" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="ตั้งรหัสผ่าน">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">ชื่อ-นามสกุล (Fullname)</label>
+                <input type="text" id="formFullname" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500">
+            </div>
+            <div class="col-span-2 flex flex-col items-center justify-center mb-2 mt-2">
+                <label class="block text-sm font-bold text-slate-700 mb-3">รูปโปรไฟล์ (อัปโหลดจากเครื่อง)</label>
+                <div class="relative group cursor-pointer" onclick="document.getElementById('uploadAvatarInput').click()">
+                    <div class="w-28 h-28 rounded-full bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden hover:border-blue-500 transition-all shadow-sm group-hover:shadow-md">
+                        <img id="avatarPreview" src="" class="w-full h-full object-cover hidden">
+                        <div id="avatarPlaceholder" class="flex flex-col items-center text-slate-400 group-hover:text-blue-500 transition-colors">
+                            <i class='bx bx-camera text-3xl'></i>
+                            <span class="text-[11px] mt-1 font-medium">คลิกเลือกรูป</span>
+                        </div>
+                    </div>
+                    <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i class='bx bx-upload text-white text-3xl'></i>
+                    </div>
+                </div>
+                <input type="file" id="uploadAvatarInput" class="hidden" accept="image/png, image/jpeg, image/jpg, image/webp" onchange="previewAvatar(event)">
+                <input type="hidden" id="formAvatarUrl"> 
+            </div>
+            <!-- ✨ จบส่วนที่เติม ✨ -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">หน่วยงาน (Agency)</label>
+                    <select id="formAgency" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 cursor-pointer">
+                        <option value="">-- เลือกหน่วยงาน --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">ฝ่าย (Department)</label>
+                    <select id="formDept" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 cursor-pointer">
+                        <option value="">-- เลือกฝ่าย --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 items-center">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
+                    <select id="formRole" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500">
+                        <option value="User">User (พนักงานทั่วไป)</option>
+                        <option value="SuperUser">SuperUser (หัวหน้างาน)</option>
+                        <option value="Admin">Admin (ผู้จัดการ)</option>
+                        <option value="SuperAdmin">SuperAdmin (ผู้ดูแลระบบ)</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-3 mt-5">
+                    <label class="text-sm font-bold text-slate-700">สถานะใช้งาน</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="formStatus" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeUserModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveUserData()" class="px-5 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+
+<div id="agencyFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+            <h3 class="font-bold text-lg text-indigo-800" id="agencyModalTitle"><i class='bx bxs-buildings mr-2'></i>เพิ่มหน่วยงานใหม่</h3>
+            <button onclick="closeAgencyModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formAgencyOldId">
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รหัสหน่วยงาน (ID)</label>
+                <input type="text" id="formAgencyId" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500" placeholder="เช่น AGC-001">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">ชื่อหน่วยงาน</label>
+                <input type="text" id="formAgencyName" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500" placeholder="เช่น ฝ่ายผลิต Machine">
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeAgencyModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveAgencyData()" class="px-5 py-2 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+<div id="deptFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-teal-50">
+            <h3 class="font-bold text-lg text-teal-800" id="deptModalTitle"><i class='bx bxs-group mr-2'></i>เพิ่มฝ่ายใหม่</h3>
+            <button onclick="closeDeptModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formDeptOldId">
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รหัสฝ่าย (ID)</label>
+                <input type="text" id="formDeptId" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-teal-500" placeholder="เช่น DPM-001">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">ชื่อฝ่าย</label>
+                <input type="text" id="formDeptName" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-teal-500" placeholder="เช่น ฝ่ายผลิต MA">
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeDeptModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveDeptData()" class="px-5 py-2 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+
+<div id="holidayFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-rose-50">
+            <h3 class="font-bold text-lg text-rose-800" id="holidayModalTitle"><i class='bx bxs-calendar-star mr-2'></i>เพิ่มวันหยุดใหม่</h3>
+            <button onclick="closeHolidayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formHolOldId">
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รหัส (ID)</label>
+                <input type="text" id="formHolId" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-500" placeholder="เช่น HD-00001">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">วันที่หยุด (ระบุเป็น DD/MM/YYYY)</label>
+                <input type="text" id="formHolDate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-500" placeholder="เช่น 01/01/2026">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รายละเอียด</label>
+                <input type="text" id="formHolDesc" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-500" placeholder="เช่น วันขึ้นปีใหม่">
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeHolidayModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveHolidayData()" class="px-5 py-2 bg-rose-500 text-white rounded-xl text-sm font-semibold hover:bg-rose-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+<div id="otTypeFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-orange-50">
+            <h3 class="font-bold text-lg text-orange-800" id="otTypeModalTitle"><i class='bx bxs-time-five mr-2'></i>เพิ่มเวลาโอทีใหม่</h3>
+            <button onclick="closeOTTypeModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formOtOldId">
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รหัส (ID)</label>
+                <input type="text" id="formOtId" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-orange-500" placeholder="เช่น OT-001">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">เวลาเริ่ม (Start)</label>
+                    <input type="time" id="formOtStart" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-orange-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">เวลาสิ้นสุด (End)</label>
+                    <input type="time" id="formOtEnd" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-orange-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">เรตโอที (เช่น 1.5, 2.0)</label>
+                <input type="number" step="0.5" id="formOtRate" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-orange-500" placeholder="เช่น 1.5">
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeOTTypeModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveOTTypeData()" class="px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+
+<div id="workdayFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+            <h3 class="font-bold text-lg text-emerald-800" id="workdayModalTitle"><i class='bx bxs-calendar-check mr-2'></i>เพิ่มวันทำงาน</h3>
+            <button onclick="closeWorkdayModal()" class="text-slate-400 hover:text-red-500 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="formWdOldId">
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">รหัสวัน (ID)</label>
+                <input type="text" id="formWdId" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" placeholder="เช่น 1">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">ชื่อวัน (Day Name)</label>
+                <input type="text" id="formWdName" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" placeholder="เช่น วันจันทร์">
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+            <button onclick="closeWorkdayModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
+            <button onclick="saveWorkdayData()" class="px-5 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
