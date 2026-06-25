@@ -2282,10 +2282,21 @@ function renderReportsTable(data) {
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center text-slate-600">${showDate}</td>
                     <td class="p-3 text-center font-bold text-slate-700">${req.id}</td>
-                    <td class="p-3 font-semibold text-slate-800">${req.fullname}</td>
-                    <td class="p-3 text-center text-slate-500 text-xs">${req.department_name}</td>
+                    <td class="p-3">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300 shadow-sm">
+                                <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" class="w-full h-full object-cover">
+                            </div>
+                            <span class="font-semibold text-slate-800 whitespace-nowrap">${req.fullname}</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-center text-slate-600 text-[11px] whitespace-nowrap">${req.agency_name}</td>
+                    <td class="p-3 text-center text-slate-500 text-[11px] whitespace-nowrap">${req.department_name}</td>
                     <td class="p-3 text-center text-slate-600 text-xs truncate max-w-[120px]" title="${req.description}">${req.description}</td>
-                    <td class="p-3 text-center text-slate-600">${req.time_range}</td>
+                    <td class="p-3 text-center text-slate-600 text-xs font-medium whitespace-nowrap">${req.time_range}</td>
+                    <td class="p-3 text-center whitespace-nowrap">
+                        <span class="bg-orange-100 text-orange-600 font-bold px-2.5 py-1 rounded-full text-[10px] border border-orange-200">${req.rate}</span>
+                    </td>
                     <td class="p-3 text-center font-bold text-blue-600">${req.hours.toFixed(2)}</td>
                     <td class="p-3 text-center">${badgeHTML}</td>
                     <td class="p-3 text-center">
@@ -2309,7 +2320,8 @@ function exportToExcel() {
         return;
     }
 
-    const exportData = currentFilteredReportData.map(req => {
+    // ✨ เพิ่ม (req, index) เพื่อดึงลำดับแถวมาใช้ ✨
+    const exportData = currentFilteredReportData.map((req, index) => {
         let statusThai = 'รอพิจารณา';
         if (req.status === 'Approved') statusThai = 'อนุมัติแล้ว';
         if (req.status === 'Rejected') statusThai = 'ไม่อนุมัติ';
@@ -2321,12 +2333,15 @@ function exportToExcel() {
         }
 
         return {
+            "ลำดับ": index + 1, // ✨ รันเลข 1, 2, 3...
             "วันที่ทำ OT": showDate,
             "รหัสคำขอ": req.id,
             "ชื่อพนักงาน": req.fullname,
+            "หน่วยงาน": req.agency_name, // ✨ เพิ่มคอลัมน์หน่วยงาน
             "ฝ่าย": req.department_name,
             "เหตุผล": req.description, 
             "ช่วงเวลา": req.time_range,
+            "ประเภทโอที": req.rate, // ✨ เพิ่มคอลัมน์ประเภท
             "จำนวนชั่วโมง": req.hours,
             "สถานะ": statusThai
         };
