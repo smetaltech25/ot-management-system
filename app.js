@@ -882,10 +882,18 @@ async function openOTDetailModal(reqId) {
         const agencyName = agencyMap[userData?.agency] || userData?.agency || '-';
         const deptName = deptMap[userData?.department] || userData?.department || '-';
 
-        document.getElementById('modalEmpDept').innerText = `หน่วยงาน: ${agencyName} | ฝ่าย: ${deptName}`;
+        // ✨ แก้ไขที่ 1: เปลี่ยนมาใช้ innerHTML และใส่ <br> เพื่อดันฝ่ายลงบรรทัดใหม่
+        document.getElementById('modalEmpDept').innerHTML = `หน่วยงาน: ${agencyName} <br> ฝ่าย: ${deptName}`;
 
         document.getElementById('modalReqId').innerText = reqData.id;
-        document.getElementById('modalDate').innerText = reqData.date_start;
+        
+        // ✨ แก้ไขที่ 2: แปลงรูปแบบวันที่จาก YYYY-MM-DD เป็น DD/MM/YYYY
+        let showDate = reqData.date_start;
+        if(showDate && showDate.includes('-')) {
+            const d = showDate.split('-');
+            showDate = `${d[2]}/${d[1]}/${d[0]}`; 
+        }
+        document.getElementById('modalDate').innerText = showDate;
         document.getElementById('modalDesc').innerText = reqData.description || '-';
         
         if (otType) {
@@ -1297,18 +1305,22 @@ function openDeptOTListModal(dateDash, dateSlash, deptName) {
             else if (req.status === 'Rejected') statusHtml = '<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600 border border-red-200"><i class="bx bx-x-circle mr-0.5"></i>ไม่อนุมัติ</span>';
             else statusHtml = '<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 border border-amber-200"><i class="bx bx-time-five mr-0.5"></i>รออนุมัติ</span>';
 
+            // ✨ สร้างตัวแปลงชื่อหน่วยงาน เพื่อโชว์ชื่อแทนรหัส ✨
+            const agencyMapList = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
+            const mappedAgencyName = agencyMapList[req.agency] || req.agency || '-';
+
             const row = document.createElement("div");
             row.className = "grid grid-cols-12 gap-2 items-center p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 rounded-lg transition-colors";
             
             row.innerHTML = `
                 <div class="col-span-5 flex items-center space-x-2 pl-1 overflow-hidden">
                     <div class="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden border border-slate-300">
-                        <!-- ✨ ใช้ getAvatarUrl ตรงนี้ ✨ -->
                         <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" class="w-full h-full object-cover">
                     </div>
                     <div class="min-w-0">
                         <p class="text-xs font-bold text-slate-700 truncate">${req.fullname}</p>
-                        <p class="text-[10px] text-slate-400 truncate">${req.agency || '-'} | ${req.department || '-'}</p>
+                        <!-- ✨ แก้ไขที่ 3: โชว์แค่ชื่อหน่วยงาน และไม่แสดงรหัสฝ่ายแล้ว ✨ -->
+                        <p class="text-[10px] text-slate-400 truncate">${mappedAgencyName}</p>
                     </div>
                 </div>
                 <div class="col-span-3 text-center text-xs font-medium text-slate-600">
