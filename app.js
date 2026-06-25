@@ -786,7 +786,25 @@ async function submitOTRequestSupabase() {
         
         let reqId = editId; 
         if (!editId) {
-            reqId = "OTR-" + Date.now().toString().slice(-4); 
+            // ✨ ให้ระบบวิ่งไปหารหัส OTR ล่าสุดในฐานข้อมูลก่อน
+            const { data: lastReq } = await supabaseClient
+                .from('ot_requests')
+                .select('id')
+                .order('id', { ascending: false })
+                .limit(1);
+
+            let nextNum = 1; // เริ่มต้นที่ 1
+            if (lastReq && lastReq.length > 0) {
+                const lastIdStr = lastReq[0].id; // เช่น OTR-0001
+                if (lastIdStr.includes('-')) {
+                    const lastNum = parseInt(lastIdStr.split('-')[1], 10);
+                    if (!isNaN(lastNum)) {
+                        nextNum = lastNum + 1; // นำเลขล่าสุดมา + 1
+                    }
+                }
+            }
+            // ✨ ประกอบร่างใหม่ และเติมเลข 0 ด้านหน้าให้ครบ 4 หลัก
+            reqId = "OTR-" + String(nextNum).padStart(4, '0'); 
         }
 
         const requestPayload = {
