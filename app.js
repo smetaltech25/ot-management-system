@@ -357,7 +357,7 @@ async function loadApprovalQueueData() {
         tbody.innerHTML = "";
 
         if (!myPendingSteps || myPendingSteps.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ สบายใจได้เลยยยย ✨</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨</td></tr>`;
             return;
         }
 
@@ -466,9 +466,16 @@ async function loadApprovalQueueData() {
 
 async function actionApproveStep(stepId, action, requestId, currentOrder, totalSteps) {
     const actionText = action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ';
-    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " รายการ ${requestId}\nกรุณาระบุเหตุผล/หมายเหตุ (ถ้ามี):`);
+    // ✨ เปลี่ยนข้อความ prompt ให้บอกว่าจำเป็นต้องระบุ
+    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " รายการ ${requestId}\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ (จำเป็นต้องระบุ):`);
     
-    if (reasonInput === null) return;
+    if (reasonInput === null) return; // กรณีผู้ใช้กดยกเลิก
+
+    // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
+    if (reasonInput.trim() === "") {
+        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะพี่ต้น`);
+        return; // หยุดการทำงานทันที
+    }
 
     try {
         await supabaseClient
@@ -476,7 +483,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
             .update({ 
                 status: action, 
                 approved_at: new Date().toLocaleDateString('th-TH'),
-                comment: reasonInput || '-'
+                comment: reasonInput.trim() // ✨ บันทึกค่าที่ตัดช่องว่างซ้ายขวาออกแล้ว
             })
             .eq('id', stepId);
 
@@ -486,7 +493,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
             await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
         }
 
-        alert("ดำเนินการพิจารณาคำขอเรียบร้อยแล้ว! 🎉");
+        alert("ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะพี่ต้น! 🎉");
         loadApprovalQueueData();
 
     } catch (err) {
@@ -940,14 +947,21 @@ async function bulkApproveSteps(action) {
     const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
     
     if (checkboxes.length === 0) {
-        alert("ยังไม่ได้เลือกรายการที่ต้องการดำเนินการ 😅 ติ๊กถูกข้างหน้าก่อนค่ะ");
+        alert("พี่ต้นยังไม่ได้เลือกรายการที่ต้องการดำเนินการเลยค่ะ 😅 ติ๊กถูกข้างหน้าก่อนน้า");
         return;
     }
 
     const actionText = action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ';
-    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " ทั้งหมด ${checkboxes.length} รายการ\nกรุณาระบุเหตุผล/หมายเหตุ (ถ้ามี):`);
+    // ✨ เปลี่ยนข้อความ prompt ให้บอกว่าจำเป็นต้องระบุ
+    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " ทั้งหมด ${checkboxes.length} รายการ\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ (จำเป็นต้องระบุ):`);
     
-    if (reasonInput === null) return;
+    if (reasonInput === null) return; // กรณีผู้ใช้กดยกเลิก
+
+    // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
+    if (reasonInput.trim() === "") {
+        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยนะคะพี่ต้น`);
+        return; // หยุดการทำงานทันที
+    }
 
     try {
         for (let cb of checkboxes) {
@@ -961,7 +975,7 @@ async function bulkApproveSteps(action) {
                 .update({ 
                     status: action, 
                     approved_at: new Date().toLocaleDateString('th-TH'),
-                    comment: reasonInput || '-' 
+                    comment: reasonInput.trim() // ✨ บันทึกค่าที่ตัดช่องว่างซ้ายขวาออกแล้ว
                 })
                 .eq('id', stepId);
 
@@ -972,7 +986,7 @@ async function bulkApproveSteps(action) {
             }
         }
 
-        alert(`✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะ!`);
+        alert(`✅ ดำเนินการ ${actionText} สำเร็จเรียบร้อยแล้วค่ะพี่ต้น!`);
         const selectAllCb = document.getElementById('selectAllCheckbox');
         if (selectAllCb) selectAllCb.checked = false;
         loadApprovalQueueData();
