@@ -800,9 +800,9 @@
     </div>
   </section>
 
-  <div id="otRequestFormModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[90dvh]">
-      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+  <div id="otRequestFormModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[80] flex items-center justify-center hidden p-4 sm:p-6">
+  <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in flex flex-col max-h-[85dvh] my-auto">
+    <div class="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
         <h3 class="font-bold text-lg text-slate-800"><i class='bx bx-edit-alt text-blue-500 mr-2'></i>แบบฟอร์มขออนุมัติทำงานล่วงเวลา</h3>
         <button onclick="closeRequestFormModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
       </div>
@@ -839,16 +839,16 @@
         </div>
       </div>
 
-      <div class="p-4 bg-white border-t border-slate-100 flex justify-end space-x-2">
+      <div class="p-4 bg-white border-t border-slate-100 flex justify-end space-x-2 shrink-0">
         <button onclick="closeRequestFormModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
         <button onclick="submitOTRequestSupabase()" class="px-5 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md">ส่งคำขออนุมัติ 🚀</button>
       </div>
     </div>
   </div>
 
-  <div id="approverModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl w-full max-w-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+  <div id="approverModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] flex items-center justify-center hidden p-4 sm:p-6">
+  <div class="bg-white rounded-2xl w-full max-w-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] my-auto">
+    <div class="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
         <h3 class="font-bold text-lg text-slate-800">เลือกผู้อนุมัติ <span class="text-sm font-normal text-slate-500">(เลือกตามลำดับ 1, 2, 3)</span></h3>
         <button onclick="closeApproverModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
       </div>
@@ -856,17 +856,16 @@
       <div id="approver-list-container" class="p-6 overflow-y-auto bg-white flex-1">
          </div>
       
-      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2 shrink-0">
         <button onclick="closeApproverModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
         <button onclick="confirmApproverSelection()" class="px-6 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 shadow-md">ยืนยันการเลือก</button>
       </div>
     </div>
   </div>
 
-  <div id="otDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-fade-in">
-        
-        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+  <div id="otDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center hidden p-4 sm:p-6">
+  <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-fade-in my-auto">
+    <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
             <h3 class="font-bold text-xl text-slate-800">รายละเอียดคำขอ OT</h3>
             <button onclick="closeOTDetailModal()" class="text-slate-400 hover:text-red-500 text-2xl transition-colors">&times;</button>
         </div>
