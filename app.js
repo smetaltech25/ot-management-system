@@ -511,13 +511,20 @@ function calculateOTHours(startStr, endStr) {
     let start = sh + (sm / 60);
     let end = eh + (em / 60);
 
+    // กรณีเวลาสิ้นสุดน้อยกว่าเวลาเริ่ม (กะข้ามวัน) จะบวกเวลาไปอีก 24 ชั่วโมง
     if (end <= start) {
         end += 24;
     }
 
     let totalHours = end - start;
 
+    // หักเวลาพักเที่ยง (12:00 - 13:00)
     if (start <= 12 && end >= 13) {
+        totalHours -= 1;
+    }
+
+    // ✨ หักเวลาพักดึก (00:00 - 01:00) สำหรับกะข้ามวัน (ช่วงชั่วโมงที่ 24 ถึง 25)
+    if (start <= 24 && end >= 25) {
         totalHours -= 1;
     }
 
