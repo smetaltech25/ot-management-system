@@ -23,7 +23,7 @@ async function loginUsersSupabase() {
     const passwordInput = document.getElementById("loginpassword").value;
 
     if (!usernameInput || !passwordInput) {
-        alert("กรอกข้อมูลให้ครบถ้วน 😤");
+        Swal.fire('ข้อมูลไม่ครบ', 'กรอกข้อมูลให้ครบถ้วน 😤', 'warning');
         return;
     }
 
@@ -37,7 +37,7 @@ async function loginUsersSupabase() {
             .single();
 
         if (error || !data) {
-            alert("⚠️ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีอาจจะยังไม่เปิดใช้งานค่ะ");
+            Swal.fire('เข้าสู่ระบบไม่สำเร็จ', '⚠️ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีอาจจะยังไม่เปิดใช้งานค่ะ', 'error');
             return;
         }
 
@@ -79,7 +79,7 @@ async function loginUsersSupabase() {
 
     } catch (err) {
         console.error("Login System Error:", err);
-        alert("อุ๊ย! เกิดข้อผิดพลาดของระบบล็อกอินนิดหน่อยค่ะ ลองใหม่อีกครั้งนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'อุ๊ย! เกิดข้อผิดพลาดของระบบล็อกอินนิดหน่อยค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
     }
 }
 
@@ -479,16 +479,26 @@ async function loadApprovalQueueData() {
 
 async function actionApproveStep(stepId, action, requestId, currentOrder, totalSteps) {
     const actionText = action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ';
-    // ✨ เปลี่ยนข้อความ prompt ให้บอกว่าจำเป็นต้องระบุ
-    const reasonInput = prompt(`ต้องการยืนยัน " ${actionText} " รายการ ${requestId}\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ (จำเป็นต้องระบุ):`);
-    
-    if (reasonInput === null) return; // กรณีผู้ใช้กดยกเลิก
 
-    // ✨ เพิ่มการตรวจสอบว่าห้ามเป็นค่าว่าง
-    if (reasonInput.trim() === "") {
-        alert(`ไม่สามารถดำเนินการได้ค่ะ ❌\nกรุณาระบุเหตุผลในการ "${actionText}" ด้วยค่ะ`);
-        return; // หยุดการทำงานทันที
-    }
+    const { value: reasonInput } = await Swal.fire({
+        title: `ยืนยันการ${actionText}`,
+        text: `รายการ ${requestId}\n⚠️ กรุณาระบุเหตุผล/หมายเหตุ:`,
+        input: 'text',
+        inputPlaceholder: 'พิมพ์เหตุผลที่นี่...',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: action === 'Approved' ? '#22c55e' : '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก',
+        inputValidator: (value) => {
+            if (!value || value.trim() === '') {
+                return `จำเป็นต้องระบุเหตุผลในการ "${actionText}" ด้วยค่ะ ❌`;
+            }
+        }
+    });
+
+    if (!reasonInput) return; // กรณีผู้ใช้กดยกเลิก
 
     try {
         await supabaseClient
@@ -506,7 +516,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
             await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
         }
 
-        alert("ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะ! 🎉");
+        Swal.fire('สำเร็จ!', 'ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะ! 🎉', 'success');
         loadApprovalQueueData();
 
     } catch (err) {
@@ -687,7 +697,7 @@ function renderApproversGrid(approvers, container) {
                 tempSelectedApprovers.splice(isSelectedIdx, 1); 
             } else {
                 if (tempSelectedApprovers.length >= 3) {
-                    alert("เลือกผู้อนุมัติครบ 3 ท่านแล้ว ถ้าต้องการเปลี่ยนตัวบุคคล ให้กดเอาคนเดิมออกก่อน💕");
+                    Swal.fire('ครบโควตาแล้ว', 'เลือกผู้อนุมัติครบ 3 ท่านแล้ว ถ้าต้องการเปลี่ยน ให้กดเอาคนเดิมออกก่อนนะคะ 💕', 'warning');
                     return;
                 }
                 tempSelectedApprovers.push(u); 
@@ -1010,7 +1020,7 @@ async function openOTDetailModal(reqId) {
 
     } catch (err) {
         console.error("Error loading OT details:", err);
-        alert("ไม่สามารถดึงข้อมูลได้ค่ะ ลองใหม่อีกครั้งนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'ดึงข้อมูลไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
         modal.classList.add('hidden');
     } finally {
         loading.classList.add('hidden'); 
@@ -1190,7 +1200,7 @@ async function editMyOTRequest(reqId) {
 
     } catch (err) {
         console.error("Edit OT Request Error:", err);
-        alert("ดึงข้อมูลไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'ดึงข้อมูลไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
     }
 }
 
@@ -1623,7 +1633,7 @@ async function saveUserData() {
     let finalAvatarUrl = document.getElementById("formAvatarUrl").value;
 
     if (!username || !password || !fullname) {
-        alert("อย่าลืมกรอก Username, Password และชื่อ-นามสกุลให้ครบถ้วนนะคะ 🥺"); 
+        Swal.fire('ข้อมูลไม่ครบ', 'อย่าลืมกรอก Username, Password และชื่อ-นามสกุลให้ครบถ้วนนะคะ 🥺', 'warning'); 
         return;
     }
 
@@ -1695,10 +1705,10 @@ async function saveUserData() {
         closeUserModal();
         loadUsersData(); 
         
-        alert(id ? "อัปเดตข้อมูลสำเร็จเรียบร้อยค่ะ ✨" : "เพิ่มผู้ใช้งานและอัปโหลดรูปสำเร็จค๊าา ✨");
+        Swal.fire('สำเร็จ!', id ? "อัปเดตข้อมูลสำเร็จเรียบร้อยค่ะ ✨" : "เพิ่มผู้ใช้งานและอัปโหลดรูปสำเร็จค๊าา ✨", 'success');
 
     } catch (err) { 
-        alert(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ"); 
+        Swal.fire('ข้อผิดพลาด', err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลค่ะ ลองใหม่อีกครั้งนะคะ", 'error');
         console.error("Save User Error:", err); 
     } finally {
         btnSave.innerHTML = originalBtnText;
@@ -1707,12 +1717,24 @@ async function saveUserData() {
 }
 
 async function deleteUserData(id, name) {
-    if(!confirm(`ต้องการลบผู้ใช้งาน "${name}" ใช่หรือไม่?\n⚠️ การลบอาจทำให้ข้อมูลประวัติ OT ของคนนี้หายไปด้วยนะคะ ไนท์แนะนำให้ใช้วิธี 'ปิดสถานะการใช้งาน' แทนค่ะ`)) return;
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบผู้ใช้งาน "${name}" ใช่หรือไม่?\n⚠️ การลบอาจทำให้ข้อมูลประวัติ OT ของคนนี้หายไปด้วยนะคะ ไนท์แนะนำให้ใช้วิธี 'ปิดสถานะการใช้งาน' แทนค่ะ`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
         await supabaseClient.from('users').delete().eq('id', id);
         loadUsersData();
-        alert("ลบข้อมูลสำเร็จค๊าา");
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ ติดข้อมูลที่ผูกไว้"); }
+        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'ลบไม่สำเร็จค่ะ ติดข้อมูลที่ผูกไว้', 'error'); }
 }
 
 // ===================================================
@@ -1779,7 +1801,8 @@ async function saveAgencyData() {
     const newName = document.getElementById("formAgencyName").value.trim();
 
     if (!newId || !newName) {
-        alert("กรุณากรอกรหัสและชื่อหน่วยงานให้ครบนะคะ"); return;
+        Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกรหัสและชื่อหน่วยงานให้ครบนะคะ', 'warning');
+        return;
     }
 
     const payload = { id: newId, name: newName }; 
@@ -1790,17 +1813,35 @@ async function saveAgencyData() {
         
         closeAgencyModal();
         loadAgenciesData();
-        alert("บันทึกข้อมูลหน่วยงานเรียบร้อยค่ะ ✨");
-    } catch (err) { alert("บันทึกไม่สำเร็จ รหัสอาจจะซ้ำกันค่ะ!"); console.error(err); }
+        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลหน่วยงานเรียบร้อยค่ะ ✨', 'success');
+    } catch (err) { 
+        Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ รหัสอาจจะซ้ำกันค่ะ!', 'error'); 
+        console.error(err); 
+    }
 }
 
-async function deleteAgencyData(id) {
-    if(!confirm(`ต้องการลบหน่วยงานรหัส ${id} ใช่หรือไม่?`)) return;
+async function deleteAgencyData(id) { // เปลี่ยนชื่อฟังก์ชันและพารามิเตอร์ตามของเดิม
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบข้อมูลรหัส ${id} ใช่หรือไม่?`, // แก้ไขข้อความตามความเหมาะสม
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-        await supabaseClient.from('agency').delete().eq('id', id);
-        loadAgenciesData();
-        alert("ลบหน่วยงานสำเร็จค๊าา");
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ"); }
+        await supabaseClient.from('agency').delete().eq('id', id); // แก้ชื่อ table ตามฟังก์ชันนั้นๆ
+        loadAgenciesData(); // เรียกใช้โหลดใหม่ให้ถูกฟังก์ชัน
+        
+        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
+    } catch (err) {
+        Swal.fire('ลบไม่ได้', 'ลบไม่สำเร็จค่ะ อาจมีข้อมูลอื่นผูกอยู่', 'error');
+    }
 }
 
 // ===================================================
@@ -1865,7 +1906,7 @@ async function saveDeptData() {
     const newId = document.getElementById("formDeptId").value.trim();
     const newName = document.getElementById("formDeptName").value.trim();
 
-    if (!newId || !newName) { alert("กรุณากรอกข้อมูลให้ครบนะคะ"); return; }
+    if (!newId || !newName) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลให้ครบนะคะ', 'warning'); return; }
 
     const payload = { id: newId, name: newName }; 
 
@@ -1875,16 +1916,29 @@ async function saveDeptData() {
         
         closeDeptModal();
         loadDepartmentsData();
-        alert("บันทึกข้อมูลฝ่ายเรียบร้อยค่ะ ✨");
-    } catch (err) { alert("บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!"); console.error(err); }
+        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลฝ่ายเรียบร้อยค่ะ ✨', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!', 'error'); console.error(err); }
 }
 
 async function deleteDeptData(id) {
-    if(!confirm(`ต้องการลบฝ่ายรหัส ${id} ใช่หรือไม่?`)) return;
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบฝ่ายรหัส ${id} ใช่หรือไม่?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
         await supabaseClient.from('departments').delete().eq('id', id);
         loadDepartmentsData();
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ"); }
+        Swal.fire('สำเร็จ', 'ลบข้อมูลฝ่ายเรียบร้อยค่ะ', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'ลบไม่สำเร็จค่ะ', 'error'); }
 }
 
 // ===================================================
@@ -1952,7 +2006,7 @@ async function saveHolidayData() {
     const newDate = document.getElementById("formHolDate").value.trim();
     const newDesc = document.getElementById("formHolDesc").value.trim();
 
-    if (!newId || !newDate || !newDesc) { alert("กรุณากรอกข้อมูลให้ครบถ้วนนะคะ"); return; }
+    if (!newId || !newDate || !newDesc) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลให้ครบถ้วนนะคะ', 'warning'); return; }
 
     const payload = { 
         id: newId, 
@@ -1966,16 +2020,32 @@ async function saveHolidayData() {
         
         closeHolidayModal();
         loadHolidaysData();
-        alert("บันทึกข้อมูลวันหยุดเรียบร้อยค่ะ ✨");
-    } catch (err) { alert("บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!"); console.error(err); }
+        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลวันหยุดเรียบร้อยค่ะ ✨', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!', 'error'); console.error(err); }
 }
 
-async function deleteHolidayData(id) {
-    if(!confirm(`ต้องการลบวันหยุดรหัส ${id} ใช่หรือไม่?`)) return;
+async function deleteHolidayData(id) { // เปลี่ยนชื่อฟังก์ชันและพารามิเตอร์ตามของเดิม
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบวันหยุดรหัส ${id} ใช่หรือไม่?`, // แก้ไขข้อความตามความเหมาะสม
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-        await supabaseClient.from('holidays').delete().eq('id', id);
-        loadHolidaysData();
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ"); }
+        await supabaseClient.from('holidays').delete().eq('id', id); // แก้ชื่อ table ตามฟังก์ชันนั้นๆ
+        loadHolidaysData(); // เรียกใช้โหลดใหม่ให้ถูกฟังก์ชัน
+        
+        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
+    } catch (err) {
+        Swal.fire('ลบไม่ได้', 'ลบไม่สำเร็จค่ะ อาจมีข้อมูลอื่นผูกอยู่', 'error');
+    }
 }
 
 // ===================================================
@@ -2065,7 +2135,7 @@ async function saveOTTypeData() {
     const end = document.getElementById("formOtEnd").value;
     const rate = document.getElementById("formOtRate").value;
 
-    if (!newId || !start || !end || !rate) { alert("กรุณากรอกข้อมูลให้ครบถ้วนนะคะ"); return; }
+    if (!newId || !start || !end || !rate) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลให้ครบถ้วนนะคะ', 'warning'); return; }
 
     const payload = { 
         id: newId, 
@@ -2080,16 +2150,32 @@ async function saveOTTypeData() {
         
         closeOTTypeModal();
         loadOTTypesData();
-        alert("บันทึกข้อมูลเวลาโอทีเรียบร้อยค่ะ ✨");
-    } catch (err) { alert("บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!"); console.error(err); }
+        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเวลาโอทีเรียบร้อยค่ะ ✨', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ รหัสอาจซ้ำกันค่ะ!', 'error'); console.error(err); }
 }
 
-async function deleteOTTypeData(id) {
-    if(!confirm(`ต้องการลบเวลาโอทีรหัส ${id} ใช่หรือไม่?\n⚠️ ระวัง: หากลบ อาจส่งผลกระทบต่อรายการคำขอโอทีเก่าที่เคยเลือกเวลานี้ไว้นะคะ`)) return;
+async function deleteOTTypeData(id) { // เปลี่ยนชื่อฟังก์ชันและพารามิเตอร์ตามของเดิม
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบเวลาโอทีรหัส ${id} ใช่หรือไม่?\n⚠️ ระวัง: หากลบ อาจส่งผลกระทบต่อรายการคำขอโอทีเก่าที่เคยเลือกเวลานี้ไว้นะคะ`, // แก้ไขข้อความตามความเหมาะสม
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-        await supabaseClient.from('ot_types').delete().eq('id', id);
-        loadOTTypesData();
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ อาจมีข้อมูลผูกอยู่"); }
+        await supabaseClient.from('ot_types').delete().eq('id', id); // แก้ชื่อ table ตามฟังก์ชันนั้นๆ
+        loadOTTypesData(); // เรียกใช้โหลดใหม่ให้ถูกฟังก์ชัน
+        
+        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
+    } catch (err) {
+        Swal.fire('ลบไม่ได้', 'ลบไม่สำเร็จค่ะ อาจมีข้อมูลอื่นผูกอยู่', 'error');
+    }
 }
 
 // ===================================================
@@ -2161,7 +2247,7 @@ async function saveWorkdayData() {
     const dayNum = document.getElementById("formWdNumber").value;
     const isWorking = document.getElementById("formWdIsWorking").checked;
 
-    if (!newName || !dayNum) { alert("กรุณากรอกข้อมูลให้ครบนะคะ"); return; }
+    if (!newName || !dayNum) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลให้ครบนะคะ', 'warning'); return; }
 
     const payload = { 
         day_name: newName, 
@@ -2178,16 +2264,32 @@ async function saveWorkdayData() {
         
         closeWorkdayModal();
         loadWorkdaysData();
-        alert("บันทึกข้อมูลสำเร็จค่ะ ✨");
-    } catch (err) { alert("บันทึกไม่สำเร็จค่ะ อาจมีชื่อซ้ำกัน!"); console.error(err); }
+        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลสำเร็จค่ะ ✨', 'success');
+    } catch (err) { Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จค่ะ อาจมีชื่อซ้ำกัน!', 'error'); console.error(err); }
 }
 
-async function deleteWorkdayData(dayName) {
-    if(!confirm(`ต้องการลบวัน "${dayName}" ใช่หรือไม่?`)) return;
+async function deleteWorkdayData(dayName) { // เปลี่ยนชื่อฟังก์ชันและพารามิเตอร์ตามของเดิม
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: `ต้องการลบข้อมูลวัน "${dayName}" ใช่หรือไม่?`, // แก้ไขข้อความตามความเหมาะสม
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-        await supabaseClient.from('day_of_week').delete().eq('day_name', dayName);
-        loadWorkdaysData();
-    } catch (err) { alert("ลบไม่สำเร็จค่ะ"); }
+        await supabaseClient.from('day_of_week').delete().eq('day_name', dayName); // แก้ชื่อ table ตามฟังก์ชันนั้นๆ
+        loadWorkdaysData(); // เรียกใช้โหลดใหม่ให้ถูกฟังก์ชัน
+        
+        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
+    } catch (err) {
+        Swal.fire('ลบไม่ได้', 'ลบไม่สำเร็จค่ะ อาจมีข้อมูลอื่นผูกอยู่', 'error');
+    }
 }
 
 // ===================================================
@@ -2215,7 +2317,7 @@ async function saveSystemSettings() {
     const token = document.getElementById("setLineToken").value.trim();
 
     if (!sysName) {
-        alert("อย่าลืมใส่ชื่อระบบนะคะ 🥺");
+        Swal.fire('ข้อมูลไม่ครบ', 'อย่าลืมใส่ชื่อระบบนะคะ 🥺', 'warning');
         return;
     }
 
@@ -2233,14 +2335,14 @@ async function saveSystemSettings() {
             loadSystemSettings();
         }
         
-        alert("💾 บันทึกการตั้งค่าระบบเรียบร้อยแล้วค๊าา!");
+        Swal.fire('สำเร็จ!', '💾 บันทึกการตั้งค่าระบบเรียบร้อยแล้วค๊าา!', 'success');
         
         if (document.querySelector(".font-bold.text-lg.text-slate-800")) {
             document.querySelector(".font-bold.text-lg.text-slate-800").innerText = sysName;
         }
 
     } catch (err) {
-        alert("เกิดข้อผิดพลาดในการบันทึกค่ะ กรุณาเช็คว่ามีตาราง system_settings หรือยังนะคะ");
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกค่ะ กรุณาเช็คว่ามีตาราง system_settings หรือยังนะคะ', 'error');
         console.error("Save Settings Error:", err);
     }
 }
@@ -2411,7 +2513,7 @@ function renderReportsTable(data) {
 
 function exportToExcel() {
     if (currentFilteredReportData.length === 0) {
-        alert("ตอนนี้ไม่มีข้อมูลให้ Export ค่ะ ลองปรับการค้นหาดูนะคะ 😅");
+        Swal.fire('ไม่มีข้อมูล', 'ตอนนี้ไม่มีข้อมูลให้ Export ค่ะ ลองปรับการค้นหาดูนะคะ 😅', 'warning');
         return;
     }
 
