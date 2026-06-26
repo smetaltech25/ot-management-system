@@ -863,7 +863,7 @@ async function submitOTRequestSupabase() {
         await supabaseClient.from('approval_steps').insert(stepsData);
 
         // ✨ อัปเกรดแจ้งเตือนตอนส่งคำขอสำเร็จเป็น SweetAlert
-        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค๊าา!" : "🚀 ส่งใบคำขอและจัดตั้งสายงานพิจารณาอนุมัติเรียบร้อยแล้วค๊าา!", 'success');
+        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค๊าา!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
         
         closeRequestFormModal();
         loadMyOTDashboardData(); 
