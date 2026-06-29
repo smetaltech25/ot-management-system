@@ -211,11 +211,18 @@ async function loadMyOTDashboardData() {
                 const labelStr = otInfo.start_time ? `${otInfo.start_time}-${otInfo.end_time} (${otInfo.rate}x)` : row.ot_type_id;
                 
                 if (!otStats[labelStr]) otStats[labelStr] = 0;
-                otStats[labelStr] += 1; 
+                
+                // ✨ ไนท์แก้จากเดิมที่บวก 1 มาเป็นการดึงฟังก์ชันคำนวณชั่วโมงมาบวกแทนค่ะ ✨
+                let hours = 0;
+                if (otInfo.start_time && otInfo.end_time) {
+                    hours = parseFloat(calculateOTHours(otInfo.start_time, otInfo.end_time));
+                }
+                otStats[labelStr] += hours; 
             });
 
             const chartLabels = Object.keys(otStats);
-            const chartCounts = chartLabels.map(l => otStats[l]);
+            // ✨ ปัดเศษชั่วโมงให้เป็นทศนิยม 2 ตำแหน่ง กราฟจะได้ตัวเลขสวยๆ ค่ะ ✨
+            const chartCounts = chartLabels.map(l => parseFloat(otStats[l].toFixed(2)));
             
             drawMyOTCharts(chartLabels, chartCounts);
         } else {
@@ -308,7 +315,7 @@ function drawMyOTCharts(labels, counts) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'จำนวนครั้งที่ขอ OT',
+                label: 'จำนวนชั่วโมงที่ขอ OT (ชม.)', // ✨ ไนท์เปลี่ยนข้อความตรงนี้ให้ค่ะ ✨
                 data: counts,
                 backgroundColor: '#10b981', 
                 borderRadius: 4,
