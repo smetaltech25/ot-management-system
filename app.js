@@ -2,7 +2,7 @@
 // app.js - ไฟล์ควบคุมระบบ OverTime Management System (Supabase)
 // ฉบับเต็มเวอร์ชันสมบูรณ์ (อัปเดตล่าสุด) จัดทำโดย ไนท์ เพื่อพี่ต้นค่ะ 💖
 // ===================================================
-
+const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw/exec"; // ✨ เอา URL จากสเต็ป 2 มาวางตรงนี้นะคะ
 let currentUser = null;
 let myOtBarChartInstance = null;
 let myOtDoughnutChartInstance = null;
@@ -870,8 +870,29 @@ async function submitOTRequestSupabase() {
         await supabaseClient.from('approval_steps').insert(stepsData);
 
         // ✨ อัปเกรดแจ้งเตือนตอนส่งคำขอสำเร็จเป็น SweetAlert
-        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค๊าา!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
-        
+        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค่ะ!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
+        // ---------------------------------------------------------
+        // 🚀 ส่งสัญญาณ Webhook แจ้งเตือนขอ OT (ส่งเฉพาะสร้างใหม่ ไม่รวมแก้ไข)
+        if (!editId) {
+            const notifyPayload = {
+                action: 'new_request',
+                data: {
+                    id: reqId,
+                    user_id: currentUser.id, 
+                    fullname: currentUser.fullname,
+                    date: dateStart,
+                    description: description
+                }
+            };
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors', // ทริคสำคัญป้องกัน Error หน้าเว็บ
+                // ✨ ไนท์เปลี่ยนจาก application/json เป็น text/plain เพื่อให้ยิงผ่านแบบ 100% ค่ะ
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(notifyPayload)
+            }).catch(err => console.error(err));
+        }
+        // ---------------------------------------------------------
         closeRequestFormModal();
         loadMyOTDashboardData(); 
 
@@ -1087,6 +1108,8 @@ async function bulkApproveSteps(action) {
     });
 
     try {
+        const approvedPayloadData = []; // ✨ ตัวแปรใหม่สำหรับมัดรวมข้อมูลส่งเมล
+
         for (let cb of checkboxes) {
             const stepId = cb.value;
             const requestId = cb.dataset.requestId;
@@ -1107,6 +1130,42 @@ async function bulkApproveSteps(action) {
             } else if (action === 'Approved' && currentOrder === totalSteps) {
                 await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
             }
+            
+            // ✨ ดึงข้อมูลพนักงานเฉพาะคนที่ "ผ่านการอนุมัติ" เพื่อส่ง Webhook ✨
+            if (action === 'Approved') {
+                const tr = cb.closest('tr'); // ดึงข้อมูลจากแถวที่ติ๊กถูก
+                const empName = tr.querySelector('.font-bold.text-slate-700').innerText;
+                const otDate = tr.cells[4].innerText;
+                const otHoursStr = tr.cells[5].innerText;
+
+                // แปลงเวลาให้เป็นจำนวนชั่วโมง
+                let hrs = 0;
+                if (otHoursStr.includes('-')) {
+                    const [start, end] = otHoursStr.split('-').map(s => s.trim());
+                    hrs = calculateOTHours(start, end);
+                }
+
+                // ✨ แก้ไขส่วนนี้ในฟังก์ชัน bulkApproveSteps ✨
+                approvedPayloadData.push({
+                user_id: currentUser.id, 
+                approver_name: currentUser.fullname, // ✨ ไนท์เพิ่มบรรทัดนี้ เพื่อส่งชื่อของคนที่กำลังล็อกอินไปให้ GAS ค่ะ
+                emp_id: tr.querySelector('.font-semibold').innerText, 
+                fullname: empName,
+                date: otDate,
+                hours: hrs
+            });
+            }
+        }
+
+        // ✨ ยิง Webhook แบบมัดรวมก้อนเดียวส่งเลย! (ถ้ามีการอนุมัติ) ✨
+        if (action === 'Approved' && approvedPayloadData.length > 0) {
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                // ✨ ไนท์เปลี่ยนจาก application/json เป็น text/plain เพื่อให้ยิงผ่านแบบ 100% ค่ะ
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'bulk_approve', data: approvedPayloadData })
+            }).catch(err => console.error(err));
         }
 
         // ✨ เปลี่ยน Alert ตอนสำเร็จเป็น SweetAlert
