@@ -1012,15 +1012,26 @@ async function openOTDetailModal(reqId) {
             stepsData.forEach((step) => {
                 const approverName = approvers?.find(a => a.id === step.approver_id)?.fullname || step.approver_id;
                 
+                // ✨ โค้ดแปลงวันที่: เติมเลข 0 ด้านหน้า และแปลง พ.ศ. เป็น ค.ศ. ✨
+                let displayDate = step.approved_at || '-';
+                if (displayDate !== '-' && displayDate.includes('/')) {
+                    let parts = displayDate.split('/');
+                    let d = parts[0].padStart(2, '0'); // เติม 0 ให้วัน
+                    let m = parts[1].padStart(2, '0'); // เติม 0 ให้เดือน
+                    let y = parseInt(parts[2]);
+                    if (y > 2500) y -= 543; // ถ้าปีเกิน 2500 ให้ลบ 543 เป็น ค.ศ.
+                    displayDate = `${d}/${m}/${y}`;
+                }
+                
                 let iconColor = 'bg-slate-200 text-slate-400';
                 let statusText = '<span class="text-slate-500 text-xs">รอคิวพิจารณา</span>';
                 
                 if (step.status === 'Approved') {
                     iconColor = 'bg-green-500 text-white';
-                    statusText = `<span class="text-green-600 text-xs font-bold">อนุมัติแล้ว (${step.approved_at || '-'})</span>`;
+                    statusText = `<span class="text-green-600 text-xs font-bold">อนุมัติแล้ว (${displayDate})</span>`;
                 } else if (step.status === 'Rejected') {
                     iconColor = 'bg-red-500 text-white';
-                    statusText = `<span class="text-red-600 text-xs font-bold">ไม่อนุมัติ (${step.approved_at || '-'})</span>`;
+                    statusText = `<span class="text-red-600 text-xs font-bold">ไม่อนุมัติ (${displayDate})</span>`;
                 } else if (step.status === 'Pending') {
                     iconColor = 'bg-amber-400 text-white border-2 border-amber-200';
                     statusText = '<span class="text-amber-500 text-xs font-bold">กำลังรอพิจารณา</span>';
