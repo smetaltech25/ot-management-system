@@ -819,35 +819,13 @@ async function submitOTRequestSupabase() {
     }
 
     try {
-        // ✨ ดึงวันที่และเวลาปัจจุบัน (เช่น 1/7/2569 : 15:30)
         const nowObj = new Date();
         const todayStr = `${nowObj.toLocaleDateString('th-TH')} : ${nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`;
         
         let reqId = editId; 
-        if (!editId) {
-            // ✨ ให้ระบบวิ่งไปหารหัส OTR ล่าสุดในฐานข้อมูลก่อน
-            const { data: lastReq } = await supabaseClient
-                .from('ot_requests')
-                .select('id')
-                .order('id', { ascending: false })
-                .limit(1);
 
-            let nextNum = 1; // เริ่มต้นที่ 1
-            if (lastReq && lastReq.length > 0) {
-                const lastIdStr = lastReq[0].id; // เช่น OTR-0001
-                if (lastIdStr.includes('-')) {
-                    const lastNum = parseInt(lastIdStr.split('-')[1], 10);
-                    if (!isNaN(lastNum)) {
-                        nextNum = lastNum + 1; // นำเลขล่าสุดมา + 1
-                    }
-                }
-            }
-            // ✨ ประกอบร่างใหม่ และเติมเลข 0 ด้านหน้าให้ครบ 4 หลัก
-            reqId = "OTR-" + String(nextNum).padStart(4, '0'); 
-        }
-
+        // ✨ 1. เตรียมข้อมูลที่จะส่งไปบันทึก (สังเกตว่าเราเอาคอลัมน์ id ออกไปแล้ว เพราะฐานข้อมูลจะจัดการให้)
         const requestPayload = {
-            id: reqId,
             description: description,
             date_start: dateStart,
             user_id: currentUser.id,
@@ -857,12 +835,24 @@ async function submitOTRequestSupabase() {
         };
 
         if (editId) {
+            // กรณีแก้ไข: อัปเดตข้อมูลเดิมตามปกติ
             await supabaseClient.from('ot_requests').update(requestPayload).eq('id', editId);
             await supabaseClient.from('approval_steps').delete().eq('request_id', editId);
         } else {
-            await supabaseClient.from('ot_requests').insert([requestPayload]);
+            // ✨ 2. กรณีสร้างใหม่: สั่ง Insert แล้วพ่วงคำสั่ง .select('id').single() เพื่อดึงรหัสใหม่กลับมา
+            const { data: newReq, error: insertErr } = await supabaseClient
+                .from('ot_requests')
+                .insert([requestPayload])
+                .select('id')
+                .single();
+
+            if (insertErr) throw insertErr;
+            
+            // นำรหัสใหม่เอี่ยม (เช่น OTR-0039) เก็บใส่ตัวแปร reqId ไว้ใช้สร้างคิวอนุมัติและส่ง Webhook ต่อ
+            reqId = newReq.id; 
         }
 
+        // นำ reqId ไปสร้าง Step อนุมัติ 1-2-3 (โค้ดส่วนนี้ใช้ของเดิมได้เลยค่ะ)
         const stepsData = [
             { id: reqId + "-STEP1", request_id: reqId, step_order: 1, approver_id: finalSelectedApprovers[0].id, status: 'Pending', assigned_date: todayStr },
             { id: reqId + "-STEP2", request_id: reqId, step_order: 2, approver_id: finalSelectedApprovers[1].id, status: 'Pending', assigned_date: todayStr },
@@ -871,15 +861,14 @@ async function submitOTRequestSupabase() {
 
         await supabaseClient.from('approval_steps').insert(stepsData);
 
-        // ✨ อัปเกรดแจ้งเตือนตอนส่งคำขอสำเร็จเป็น SweetAlert
         Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค่ะ!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
-        // ---------------------------------------------------------
-        // 🚀 ส่งสัญญาณ Webhook แจ้งเตือนขอ OT (ส่งเฉพาะสร้างใหม่ ไม่รวมแก้ไข)
+        
+        // 🚀 ส่งสัญญาณ Webhook แจ้งเตือนขอ OT
         if (!editId) {
             const notifyPayload = {
                 action: 'new_request',
                 data: {
-                    id: reqId,
+                    id: reqId, // ตัวนี้ก็จะได้ OTR ใหม่ไปส่งด้วยอย่างสวยงามค่ะ
                     user_id: currentUser.id, 
                     fullname: currentUser.fullname,
                     date: dateStart,
@@ -888,13 +877,12 @@ async function submitOTRequestSupabase() {
             };
             fetch(WEBHOOK_URL, {
                 method: 'POST',
-                mode: 'no-cors', // ทริคสำคัญป้องกัน Error หน้าเว็บ
-                // ✨ ไนท์เปลี่ยนจาก application/json เป็น text/plain เพื่อให้ยิงผ่านแบบ 100% ค่ะ
+                mode: 'no-cors', 
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(notifyPayload)
             }).catch(err => console.error(err));
         }
-        // ---------------------------------------------------------
+        
         closeRequestFormModal();
         loadMyOTDashboardData(); 
 
