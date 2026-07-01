@@ -283,7 +283,7 @@ async function loadMyOTDashboardData() {
                 <td class="p-4 text-slate-600 text-center">${timeStr}</td>
                 <td class="p-4 text-slate-600 text-center">${showDate}</td>
                 <td class="p-4 text-slate-600 text-center">${hrsStr}</td>
-                <td class="p-4 text-slate-600 truncate max-w-[150px]" title="${row.description}">${row.description || '-'}</td>
+                <td class="p-4 text-slate-600 truncate max-w-[150px] text-center" title="${row.description}">${row.description || '-'}</td>
                 <td class="p-4 text-center">${badgeHTML}</td>
                 <td class="p-4 text-center">
                     <div class="flex items-center justify-center space-x-1.5">
@@ -512,7 +512,7 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
             .from('approval_steps')
             .update({ 
                 status: action, 
-                approved_at: new Date().toLocaleDateString('th-TH'),
+                approved_at: `${new Date().toLocaleDateString('th-TH')} : ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`,
                 comment: reasonInput.trim() // ✨ บันทึกค่าที่ตัดช่องว่างซ้ายขวาออกแล้ว
             })
             .eq('id', stepId);
@@ -819,7 +819,9 @@ async function submitOTRequestSupabase() {
     }
 
     try {
-        const todayStr = new Date().toLocaleDateString('th-TH');
+        // ✨ ดึงวันที่และเวลาปัจจุบัน (เช่น 1/7/2569 : 15:30)
+        const nowObj = new Date();
+        const todayStr = `${nowObj.toLocaleDateString('th-TH')} : ${nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`;
         
         let reqId = editId; 
         if (!editId) {
@@ -1012,15 +1014,18 @@ async function openOTDetailModal(reqId) {
             stepsData.forEach((step) => {
                 const approverName = approvers?.find(a => a.id === step.approver_id)?.fullname || step.approver_id;
                 
-                // ✨ โค้ดแปลงวันที่: เติมเลข 0 ด้านหน้า และแปลง พ.ศ. เป็น ค.ศ. ✨
+                // ✨ โค้ดแปลงวันที่และเวลา: จัดฟอร์แมต ค.ศ. และต่อท้ายด้วยเวลา ✨
                 let displayDate = step.approved_at || '-';
                 if (displayDate !== '-' && displayDate.includes('/')) {
-                    let parts = displayDate.split('/');
-                    let d = parts[0].padStart(2, '0'); // เติม 0 ให้วัน
-                    let m = parts[1].padStart(2, '0'); // เติม 0 ให้เดือน
+                    let [datePart, timePart] = displayDate.split(' : '); // แยกวันที่กับเวลาออกจากกัน
+                    let parts = datePart.trim().split('/');
+                    let d = parts[0].padStart(2, '0'); 
+                    let m = parts[1].padStart(2, '0'); 
                     let y = parseInt(parts[2]);
-                    if (y > 2500) y -= 543; // ถ้าปีเกิน 2500 ให้ลบ 543 เป็น ค.ศ.
+                    if (y > 2500) y -= 543; 
+                    
                     displayDate = `${d}/${m}/${y}`;
+                    if (timePart) displayDate += ` : ${timePart}`; // ถ้ามีเวลาให้เอามาต่อท้าย
                 }
                 
                 let iconColor = 'bg-slate-200 text-slate-400';
@@ -1131,7 +1136,7 @@ async function bulkApproveSteps(action) {
                 .from('approval_steps')
                 .update({ 
                     status: action, 
-                    approved_at: new Date().toLocaleDateString('th-TH'),
+                    approved_at: `${new Date().toLocaleDateString('th-TH')} : ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`,
                     comment: reasonInput.trim()
                 })
                 .eq('id', stepId);
