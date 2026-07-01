@@ -1425,7 +1425,7 @@ function renderCalendar() {
             holidayText = `<div class="text-[10px] text-red-500 text-center font-bold truncate absolute top-2 left-0 w-full px-2" title="${holidayDesc}">${holidayDesc}</div>`;
             paddingTop = "pt-6"; // ดันตัวเลขลงมาเพื่อหลบข้อความ
         } else if (isToday) {
-            cellClasses += " border-green-500 ring-2 ring-green-100"; // ขอบเขียวสำหรับวันนี้
+            cellClasses += " border-green-500 border-[3px] "; // ขอบเขียวสำหรับวันนี้
         } else {
             cellClasses += " border-slate-100 hover:border-blue-300"; // ขอบปกติ
         }
