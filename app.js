@@ -508,14 +508,17 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
     if (!reasonInput) return; // กรณีผู้ใช้กดยกเลิก
 
     try {
-        await supabaseClient
-            .from('approval_steps')
-            .update({ 
-                status: action, 
-                approved_at: `${new Date().toLocaleDateString('th-TH')} : ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`,
-                comment: reasonInput.trim() // ✨ บันทึกค่าที่ตัดช่องว่างซ้ายขวาออกแล้ว
-            })
-            .eq('id', stepId);
+        const now = new Date();
+const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+await supabaseClient
+    .from('approval_steps')
+    .update({ 
+        status: action, 
+        approved_at: timestampStr,
+        comment: reasonInput.trim()
+    })
+    .eq('id', stepId);
 
         if (action === 'Rejected') {
             await supabaseClient.from('ot_requests').update({ status: 'Rejected' }).eq('id', requestId);
@@ -820,7 +823,12 @@ async function submitOTRequestSupabase() {
 
     try {
         const nowObj = new Date();
-        const todayStr = `${nowObj.toLocaleDateString('th-TH')} : ${nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`;
+const d = String(nowObj.getDate()).padStart(2, '0');
+const m = String(nowObj.getMonth() + 1).padStart(2, '0');
+const y = nowObj.getFullYear(); // ดึงปี ค.ศ. เสมอ
+const h = String(nowObj.getHours()).padStart(2, '0');
+const min = String(nowObj.getMinutes()).padStart(2, '0');
+const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
         
         let reqId = editId; 
 
@@ -1120,14 +1128,17 @@ async function bulkApproveSteps(action) {
             const currentOrder = parseInt(cb.dataset.stepOrder);
             const totalSteps = parseInt(cb.dataset.totalSteps);
 
-            await supabaseClient
-                .from('approval_steps')
-                .update({ 
-                    status: action, 
-                    approved_at: `${new Date().toLocaleDateString('th-TH')} : ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`,
-                    comment: reasonInput.trim()
-                })
-                .eq('id', stepId);
+            const now = new Date();
+const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+await supabaseClient
+    .from('approval_steps')
+    .update({ 
+        status: action, 
+        approved_at: timestampStr,
+        comment: reasonInput.trim()
+    })
+    .eq('id', stepId);
 
             if (action === 'Rejected') {
                 await supabaseClient.from('ot_requests').update({ status: 'Rejected' }).eq('id', requestId);
