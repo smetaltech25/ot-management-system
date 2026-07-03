@@ -42,6 +42,7 @@ async function loginUsersSupabase() {
         }
 
         currentUser = data;
+        localStorage.setItem('oms_user_session', JSON.stringify(data)); // ✨ เพิ่มบรรทัดนี้: จำการล็อกอินลงในเครื่อง
         
         document.getElementById("headerFullname").innerText = data.fullname;
         document.getElementById("headerRole").innerText = data.role;
@@ -934,6 +935,7 @@ function logoutUsers() {
         timer: 2000 // ตั้งให้ปิดอัตโนมัติใน 2 วินาทีได้ด้วยค่ะ
     }).then(() => {
         currentUser = null;
+        localStorage.removeItem('oms_user_session'); // ✨ เพิ่มบรรทัดนี้: ล้างการจำล็อกอินทิ้งเมื่อกดออกจากระบบ
         document.getElementById("dashboardPage").style.display = "none";
         document.getElementById("pageformLogin").style.display = "flex"; 
         
@@ -2671,12 +2673,45 @@ function updateDarkModeKnob(isDark) {
 
 // ตรวจสอบโหมดตอนเปิดเว็บครั้งแรก
 document.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-        updateDarkModeKnob(true);
-    } else {
-        document.documentElement.classList.remove('dark');
-        updateDarkModeKnob(false);
+    // (โค้ดฟังก์ชัน Dark Mode เดิมของพี่ต้นปล่อยไว้เหมือนเดิมนะคะ) ...
+
+    // ✨ โค้ดเพิ่มใหม่: เช็คว่ามีการจำล็อกอินไว้ไหม ถ้าระบบจำไว้ ให้พาเข้าสู่ระบบเลยแบบไม่ต้องกรอกรหัส!
+    const savedSession = localStorage.getItem('oms_user_session');
+    if (savedSession) {
+        const data = JSON.parse(savedSession);
+        currentUser = data;
+        
+        // จัดการแสดงผลข้อมูล User บน Header
+        document.getElementById("headerFullname").innerText = data.fullname;
+        document.getElementById("headerRole").innerText = data.role;
+        
+        // อัปเดตรูปโปรไฟล์มุมขวา
+        const avatarCircle = document.getElementById("userAvatarCircle");
+        avatarCircle.classList.add("overflow-hidden"); 
+        if(data.avatar_url) {
+            avatarCircle.innerHTML = `<img src="${data.avatar_url}" class="w-full h-full object-cover">`;
+        } else {
+            avatarCircle.innerHTML = data.fullname.charAt(0);
+        }
+
+        // จัดการเมนูต่างๆ ตามสิทธิ์
+        const adminMenu = document.getElementById("adminMenuSection");
+        const menuTab2 = document.getElementById("menuTab2"); 
+        const menuTab5 = document.getElementById("menuTab5"); 
+
+        if (adminMenu) adminMenu.style.display = (data.role === 'SuperAdmin') ? "block" : "none";
+        if (data.role === 'User') {
+            if (menuTab2) menuTab2.style.display = "none";
+            if (menuTab5) menuTab5.style.display = "none";
+        } else {
+            if (menuTab2) menuTab2.style.display = "flex";
+            if (menuTab5) menuTab5.style.display = "flex";
+        }
+
+        // ปิดหน้าล็อกอิน เปิดหน้า Dashboard
+        document.getElementById("pageformLogin").style.display = "none";
+        document.getElementById("dashboardPage").style.display = "block";
+        changePage(1);
     }
 });
 
