@@ -963,8 +963,10 @@
   <script src="config.js?v=1"></script>
   <script src="app.js?v=1"></script>
 
+  <!-- ================= เริ่มต้นส่วนที่แก้ไข (Pop-up รายชื่อจากปฏิทิน) ================= -->
   <div id="deptOTListModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[65] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-fade-in">
+    <!-- 1. แก้ไขให้กล่องกว้างขึ้นบนจอคอม (เพิ่ม md:max-w-4xl) -->
+    <div class="bg-white rounded-2xl w-full max-w-lg md:max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-fade-in">
       
       <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-blue-50">
         <div>
@@ -976,18 +978,38 @@
         <button onclick="closeDeptOTListModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white">&times;</button>
       </div>
 
-      <div class="grid grid-cols-12 gap-2 p-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
+      <!-- 2. หัวตารางสำหรับมือถือ (ใส่ md:hidden เพื่อให้ซ่อนตอนเปิดบนคอม) -->
+      <div class="md:hidden grid grid-cols-12 gap-2 p-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
           <div class="col-span-5 text-left pl-2">พนักงาน</div>
           <div class="col-span-3">ช่วงเวลา</div>
           <div class="col-span-2">สถานะ</div>
           <div class="col-span-2">จัดการ</div>
       </div>
 
-      <div id="deptOTListContainer" class="p-2 overflow-y-auto flex-1 bg-white space-y-1 custom-scrollbar">
+      <!-- 3. หัวตารางสำหรับคอมพิวเตอร์ (แบ่ง 2 ฝั่ง ซ้าย-ขวา) -->
+      <div class="hidden md:grid md:grid-cols-2 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
+          <div class="grid grid-cols-12 gap-2 p-3">
+              <div class="col-span-5 text-left pl-2">พนักงาน</div>
+              <div class="col-span-3">ช่วงเวลา</div>
+              <div class="col-span-2">สถานะ</div>
+              <div class="col-span-2">จัดการ</div>
           </div>
+          <div class="grid grid-cols-12 gap-2 p-3 border-l border-slate-200">
+              <div class="col-span-5 text-left pl-2">พนักงาน</div>
+              <div class="col-span-3">ช่วงเวลา</div>
+              <div class="col-span-2">สถานะ</div>
+              <div class="col-span-2">จัดการ</div>
+          </div>
+      </div>
+
+      <!-- 4. ปรับกล่องใส่รายชื่อให้แบ่ง 2 คอลัมน์บนคอม (เพิ่ม md:grid md:grid-cols-2) -->
+      <div id="deptOTListContainer" class="p-2 overflow-y-auto flex-1 bg-white space-y-1 md:space-y-0 md:grid md:grid-cols-2 md:gap-2 custom-scrollbar">
+          <!-- ข้อมูลพนักงานจะถูกดึงมาใส่ตรงนี้ -->
+      </div>
       
     </div>
   </div>
+  <!-- ================= สิ้นสุดส่วนที่แก้ไข ================= -->
 
   <div id="userFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-fade-in">
