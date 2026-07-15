@@ -124,7 +124,7 @@ function changePage(pageNumber) {
     if (pageNumber === 1) loadMyOTDashboardData();
     if (pageNumber === 2) loadApprovalQueueData();
     if (pageNumber === 3) initCalendar(); 
-    if (pageNumber === 5) loadReportsData();
+    if (pageNumber === 5) initializeReportsPage();
     if (pageNumber === 6) loadUsersData(); 
     if (pageNumber === 7) loadAgenciesData(); 
     if (pageNumber === 8) loadDepartmentsData(); 
@@ -2435,113 +2435,269 @@ async function saveSystemSettings() {
 // ===================================================
 let allReportData = []; 
 let currentFilteredReportData = []; 
+const REPORT_MAX_RANGE_DAYS = 90;
+const REPORT_QUERY_TIMEOUT_MS = 20000;
+let reportPageInitialized = false;
+let reportIsLoading = false;
+let reportSearchToken = 0;
+let reportDepartments = [];
+
+function formatReportDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function setReportSummary(total = 0, approved = 0, hours = 0) {
+    document.getElementById("reportTotalReq").innerText = total;
+    document.getElementById("reportTotalApproved").innerText = approved;
+    document.getElementById("reportTotalHours").innerText = Number(hours || 0).toFixed(2);
+}
+
+function setReportTableMessage(message, colorClass = "text-slate-400") {
+    const tbody = document.getElementById("reportsTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="11" class="p-10 text-center ${colorClass}">${message}</td></tr>`;
+}
+
+function setReportLoading(isLoading) {
+    reportIsLoading = isLoading;
+    const button = document.getElementById("reportSearchBtn");
+
+    if (button) {
+        button.innerHTML = isLoading
+            ? "<i class='bx bx-loader-alt bx-spin text-lg mr-2'></i> กำลังค้นหา..."
+            : "<i class='bx bx-search text-lg mr-2'></i> ค้นหา";
+    }
+
+    validateReportFilters();
+}
+
+function validateReportFilters(showMessage = false) {
+    const startValue = document.getElementById("reportStartDate")?.value || "";
+    const endValue = document.getElementById("reportEndDate")?.value || "";
+    const messageElement = document.getElementById("reportValidationMessage");
+    const searchButton = document.getElementById("reportSearchBtn");
+    let message = "";
+
+    if (!startValue || !endValue) {
+        message = "กรุณาเลือกวันที่เริ่มต้นและวันที่สิ้นสุดให้ครบค่ะ";
+    } else {
+        const startDate = new Date(`${startValue}T00:00:00Z`);
+        const endDate = new Date(`${endValue}T00:00:00Z`);
+
+        if (endDate < startDate) {
+            message = "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้นค่ะ";
+        } else {
+            const rangeDays = Math.floor((endDate - startDate) / 86400000) + 1;
+            if (rangeDays > REPORT_MAX_RANGE_DAYS) {
+                message = `ช่วงวันที่ต้องไม่เกิน ${REPORT_MAX_RANGE_DAYS} วันค่ะ`;
+            }
+        }
+    }
+
+    if (messageElement) {
+        messageElement.textContent = message;
+        messageElement.classList.toggle("hidden", !message || !showMessage);
+    }
+
+    if (searchButton) searchButton.disabled = Boolean(message) || reportIsLoading;
+
+    return {
+        valid: !message,
+        message,
+        startDate: startValue,
+        endDate: endValue
+    };
+}
+
+function filterReports() {
+    reportSearchToken++;
+    allReportData = [];
+    currentFilteredReportData = [];
+
+    if (reportIsLoading) setReportLoading(false);
+    setReportSummary();
+    setReportTableMessage("ปรับเงื่อนไขแล้ว กรุณากดปุ่ม “ค้นหา” เพื่อแสดงรายงานค่ะ 🔎");
+    validateReportFilters(true);
+}
+
+async function withReportTimeout(promise, timeoutMs = REPORT_QUERY_TIMEOUT_MS) {
+    let timeoutId;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error("Report query timeout")), timeoutMs);
+            })
+        ]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function loadReportDepartments() {
+    const deptSelect = document.getElementById("reportDept");
+    if (!deptSelect) return;
+
+    const selectedValue = deptSelect.value;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('departments')
+            .select('id, name')
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+        reportDepartments = data || [];
+        deptSelect.innerHTML = '<option value="">ทั้งหมด (All)</option>';
+
+        reportDepartments.forEach(dept => {
+            const option = document.createElement("option");
+            option.value = dept.id;
+            option.textContent = dept.name || dept.id;
+            deptSelect.appendChild(option);
+        });
+
+        if (selectedValue && reportDepartments.some(dept => dept.id === selectedValue)) {
+            deptSelect.value = selectedValue;
+        }
+    } catch (err) {
+        console.error("Load Report Departments Error:", err);
+    }
+}
+
+function initializeReportsPage() {
+    const today = new Date();
+    const startInput = document.getElementById("reportStartDate");
+    const endInput = document.getElementById("reportEndDate");
+
+    if (!startInput || !endInput) return;
+
+    if (!startInput.value) {
+        startInput.value = formatReportDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    }
+    if (!endInput.value) {
+        endInput.value = formatReportDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    }
+
+    if (!reportPageInitialized) {
+        reportPageInitialized = true;
+        setReportSummary();
+        setReportTableMessage("กรุณากำหนดเงื่อนไข แล้วกดปุ่ม “ค้นหา” เพื่อแสดงรายงานค่ะ 🔎");
+    }
+
+    validateReportFilters();
+    loadReportDepartments();
+}
 
 async function loadReportsData() {
+    if (reportIsLoading) return;
+
+    const validation = validateReportFilters(true);
+    if (!validation.valid) return;
+
+    const filterDept = document.getElementById("reportDept").value;
+    const filterStatus = document.getElementById("reportStatus").value;
+    const filterSearch = document.getElementById("reportSearch").value.trim();
+    const requestToken = ++reportSearchToken;
+
+    setReportLoading(true);
+    setReportSummary();
+    setReportTableMessage("<i class='bx bx-loader-alt bx-spin text-3xl text-blue-500'></i><p class='mt-2'>กำลังค้นหาข้อมูลรายงาน...</p>");
+
     try {
-        const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        
-        const formatDate = (date) => {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
+        let requestQuery = supabaseClient
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, description, status')
+            .gte('date_start', validation.startDate)
+            .lte('date_start', validation.endDate)
+            .order('date_start', { ascending: false });
 
-        const startInput = document.getElementById("reportStartDate");
-        const endInput = document.getElementById("reportEndDate");
-        if (!startInput.value) startInput.value = formatDate(firstDay);
-        if (!endInput.value) endInput.value = formatDate(lastDay);
+        if (filterStatus) requestQuery = requestQuery.eq('status', filterStatus);
 
-        const [reqRes, userRes, typeRes, deptRes] = await Promise.all([
-            supabaseClient.from('ot_requests').select('*').order('date_start', { ascending: false }),
-            supabaseClient.from('users').select('id, fullname, department, agency, avatar_url'),
-            supabaseClient.from('ot_types').select('*'),
-            supabaseClient.from('departments').select('*') 
-        ]);
+        let userQuery = supabaseClient
+            .from('users')
+            .select('id, fullname, department, agency, avatar_url');
+
+        if (filterDept) userQuery = userQuery.eq('department', filterDept);
+        if (filterSearch) userQuery = userQuery.ilike('fullname', `%${filterSearch}%`);
+
+        const departmentPromise = reportDepartments.length > 0
+            ? Promise.resolve({ data: reportDepartments, error: null })
+            : supabaseClient.from('departments').select('id, name');
+
+        const [reqRes, userRes, typeRes, deptRes] = await withReportTimeout(Promise.all([
+            requestQuery,
+            userQuery,
+            supabaseClient.from('ot_types').select('id, start_time, end_time, rate'),
+            departmentPromise
+        ]));
+
+        if (requestToken !== reportSearchToken) return;
+        if (reqRes.error) throw reqRes.error;
+        if (userRes.error) throw userRes.error;
+        if (typeRes.error) throw typeRes.error;
+        if (deptRes.error) throw deptRes.error;
 
         const reqs = reqRes.data || [];
         const users = userRes.data || [];
         const otTypes = typeRes.data || [];
         const depts = deptRes.data || [];
-
-        const deptSelect = document.getElementById("reportDept");
-        if (deptSelect.options.length <= 1) { 
-            depts.forEach(d => {
-                const dName = d.name || d.department_name || d.id;
-                deptSelect.innerHTML += `<option value="${d.id}">${dName}</option>`;
-            });
-        }
-
+        const userMap = new Map(users.map(user => [user.id, user]));
+        const typeMap = new Map(otTypes.map(type => [type.id, type]));
+        const deptMap = new Map(depts.map(dept => [dept.id, dept]));
+        const restrictByUser = Boolean(filterDept || filterSearch);
         const agencyMapList = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
 
-        allReportData = reqs.map(req => {
-            const user = users.find(u => u.id === req.user_id) || {};
-            const otType = otTypes.find(t => t.id === req.ot_type_id) || {};
-            
-            let hrs = "0.00";
-            if (otType.start_time && otType.end_time) {
-                hrs = calculateOTHours(otType.start_time, otType.end_time);
-            }
+        allReportData = reqs
+            .filter(req => !restrictByUser || userMap.has(req.user_id))
+            .map(req => {
+                const user = userMap.get(req.user_id) || {};
+                const otType = typeMap.get(req.ot_type_id) || {};
+                const department = deptMap.get(user.department) || {};
+                const hours = otType.start_time && otType.end_time
+                    ? parseFloat(calculateOTHours(otType.start_time, otType.end_time))
+                    : 0;
 
-            return {
-                ...req,
-                fullname: user.fullname || req.user_id || '-',
-                avatar_url: user.avatar_url || '', // ✨ เพิ่มรูป
-                agency_name: agencyMapList[user.agency] || user.agency || '-', // ✨ เพิ่มชื่อหน่วยงาน
-                department_id: user.department || '-',
-                department_name: depts.find(d => d.id === user.department)?.name || user.department || '-',
-                time_range: otType.start_time ? `${otType.start_time} - ${otType.end_time}` : '-',
-                rate: otType.rate ? `${otType.rate} เท่า` : '-', // ✨ เพิ่มประเภท/เรตโอที
-                hours: parseFloat(hrs),
-                description: req.description || '-' 
-            };
-        });
+                return {
+                    ...req,
+                    fullname: user.fullname || req.user_id || '-',
+                    avatar_url: user.avatar_url || '',
+                    agency_name: agencyMapList[user.agency] || user.agency || '-',
+                    department_id: user.department || '-',
+                    department_name: department.name || user.department || '-',
+                    time_range: otType.start_time ? `${otType.start_time} - ${otType.end_time}` : '-',
+                    rate: otType.rate ? `${otType.rate} เท่า` : '-',
+                    hours,
+                    description: req.description || '-'
+                };
+            });
 
-        filterReports();
-
+        currentFilteredReportData = [...allReportData];
+        renderReportsTable(currentFilteredReportData);
     } catch (err) {
+        if (requestToken !== reportSearchToken) return;
+        allReportData = [];
+        currentFilteredReportData = [];
+        setReportSummary();
+        setReportTableMessage("โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วกดค้นหาอีกครั้งค่ะ", "text-red-500");
         console.error("Load Reports Error:", err);
+    } finally {
+        if (requestToken === reportSearchToken) setReportLoading(false);
     }
-}
-
-function filterReports() {
-    const filterStart = document.getElementById("reportStartDate").value; 
-    const filterEnd = document.getElementById("reportEndDate").value;
-    const filterDept = document.getElementById("reportDept").value;
-    const filterStatus = document.getElementById("reportStatus").value;
-    const filterSearch = document.getElementById("reportSearch").value.toLowerCase();
-
-    currentFilteredReportData = allReportData.filter(item => {
-        let match = true;
-        
-        if (filterStart && item.date_start < filterStart) match = false;
-        if (filterEnd && item.date_start > filterEnd) match = false;
-        
-        if (filterDept && item.department_id !== filterDept) match = false;
-        
-        if (filterStatus && item.status !== filterStatus) match = false;
-        
-        if (filterSearch && !item.fullname.toLowerCase().includes(filterSearch)) match = false;
-
-        return match;
-    });
-
-    renderReportsTable(currentFilteredReportData);
 }
 
 function renderReportsTable(data) {
     const tbody = document.getElementById("reportsTableBody");
-    tbody.innerHTML = "";
-
     let totalApproved = 0;
     let totalHours = 0;
 
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">ไม่พบข้อมูลตามเงื่อนไขที่ค้นหาค่ะ 🍃</td></tr>`;
+        setReportTableMessage("ไม่พบข้อมูลตามเงื่อนไขที่ค้นหาค่ะ 🍃");
     } else {
-        data.forEach(req => {
+        const rowsHTML = data.map(req => {
             if (req.status === 'Approved') {
                 totalApproved++;
                 totalHours += req.hours;
@@ -2558,7 +2714,7 @@ function renderReportsTable(data) {
                 showDate = `${d[2]}/${d[1]}/${d[0]}`; 
             }
             
-            tbody.innerHTML += `
+            return `
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center text-slate-600">${showDate}</td>
                     <td class="p-3 text-center font-bold text-slate-700">${req.id}</td>
@@ -2586,12 +2742,12 @@ function renderReportsTable(data) {
                     </td>
                 </tr>
             `;
-        });
+        }).join("");
+
+        tbody.innerHTML = rowsHTML;
     }
 
-    document.getElementById("reportTotalReq").innerText = data.length;
-    document.getElementById("reportTotalApproved").innerText = totalApproved;
-    document.getElementById("reportTotalHours").innerText = totalHours.toFixed(2);
+    setReportSummary(data.length, totalApproved, totalHours);
 }
 
 function exportToExcel() {

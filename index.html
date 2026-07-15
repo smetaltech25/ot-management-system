@@ -451,8 +451,15 @@
             </div>
             <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1">ค้นหาชื่อพนักงาน</label>
-                <input type="text" id="reportSearch" onkeyup="filterReports()" placeholder="พิมพ์ชื่อเพื่อค้นหา..." class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm">
+                <input type="text" id="reportSearch" oninput="filterReports()" onkeydown="if(event.key === 'Enter') loadReportsData()" placeholder="พิมพ์ชื่อเพื่อค้นหา..." class="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm">
             </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <p id="reportValidationMessage" class="hidden text-sm font-medium text-red-500"></p>
+            <button id="reportSearchBtn" onclick="loadReportsData()" disabled class="sm:ml-auto px-6 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 shadow-md flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500">
+                <i class='bx bx-search text-lg mr-2'></i> ค้นหา
+            </button>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -495,7 +502,10 @@
                     </tr>
                 </thead>
                 <tbody id="reportsTableBody" class="divide-y divide-slate-100">
-                    </tbody>
+                    <tr>
+                        <td colspan="11" class="p-10 text-center text-slate-400">กรุณากำหนดเงื่อนไข แล้วกดปุ่ม “ค้นหา” เพื่อแสดงรายงานค่ะ 🔎</td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     </div>
