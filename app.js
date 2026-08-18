@@ -9,6 +9,122 @@ let myOtDoughnutChartInstance = null;
 let finalSelectedApprovers = []; 
 let tempSelectedApprovers = [];  
 
+const MY_OT_REQUESTS_PAGE_SIZE = 10;
+let myOTDashboardRequests = [];
+let myOTDashboardOTTypeMap = new Map();
+let myOTDashboardHasActionMap = new Map();
+let myOTDashboardCurrentPage = 1;
+let myOTDashboardSearchTerm = "";
+let otDetailRequestToken = 0;
+
+const AGENCY_NAME_MAP = {
+    'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending',
+    'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding',
+    'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR',
+    'AGC-015': 'Planning', 'AGC-016': 'Accounting'
+};
+
+const DEPARTMENT_NAME_MAP = {
+    'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี',
+    'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM'
+};
+
+function getUserOrganizationLabel(user) {
+    const agencyName = AGENCY_NAME_MAP[user?.agency] || user?.agency || '-';
+    const departmentName = DEPARTMENT_NAME_MAP[user?.department] || user?.department || '-';
+    return `${agencyName} : ${departmentName}`;
+}
+
+function parseOTRequestDate(dateValue) {
+    if (!dateValue) return null;
+
+    const isoMatch = String(dateValue).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+
+    const slashMatch = String(dateValue).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!slashMatch) return null;
+
+    let year = Number(slashMatch[3]);
+    if (year > 2500) year -= 543;
+    return new Date(year, Number(slashMatch[2]) - 1, Number(slashMatch[1]));
+}
+
+function getCurrentOTPeriod(referenceDate = new Date()) {
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const isNewPeriod = referenceDate.getDate() >= 16;
+
+    return {
+        start: isNewPeriod ? new Date(year, month, 16) : new Date(year, month - 1, 16),
+        end: isNewPeriod ? new Date(year, month + 1, 15) : new Date(year, month, 15)
+    };
+}
+
+function formatOTPeriodDate(date) {
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function summarizeApprovedOTHours(requests, otTypes, dateFilter = () => true) {
+    const otTypeMap = new Map((otTypes || []).map((ot, index) => [ot.id, { ...ot, displayOrder: index }]));
+    const summaryMap = new Map();
+
+    (requests || [])
+        .filter(request => request.status === 'Approved' && dateFilter(request))
+        .forEach(request => {
+            const otType = otTypeMap.get(request.ot_type_id);
+            if (!otType?.start_time || !otType?.end_time) return;
+
+            const hours = Number(calculateOTHours(otType.start_time, otType.end_time));
+            if (!Number.isFinite(hours)) return;
+
+            const label = `${otType.start_time} - ${otType.end_time} (${otType.rate}x)`;
+            const current = summaryMap.get(request.ot_type_id) || {
+                id: request.ot_type_id,
+                label,
+                hours: 0,
+                displayOrder: otType.displayOrder
+            };
+            current.hours += hours;
+            summaryMap.set(request.ot_type_id, current);
+        });
+
+    const items = Array.from(summaryMap.values()).sort((a, b) => a.displayOrder - b.displayOrder);
+    return {
+        totalHours: items.reduce((sum, item) => sum + item.hours, 0),
+        items
+    };
+}
+
+function renderOTHoursBreakdown(containerId, summary, accentClass) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.replaceChildren();
+    if (summary.items.length === 0) {
+        const emptyText = document.createElement('p');
+        emptyText.className = 'text-xs text-slate-400';
+        emptyText.textContent = 'ยังไม่มีชั่วโมง OT ที่อนุมัติ';
+        container.appendChild(emptyText);
+        return;
+    }
+
+    summary.items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2';
+
+        const label = document.createElement('span');
+        label.className = 'text-[11px] sm:text-xs font-medium text-slate-600 truncate';
+        label.textContent = item.label;
+
+        const hours = document.createElement('span');
+        hours.className = `text-xs font-bold whitespace-nowrap ${accentClass}`;
+        hours.textContent = `${item.hours.toFixed(2)} ชม.`;
+
+        row.append(label, hours);
+        container.appendChild(row);
+    });
+}
+
 // ✨ ฟังก์ชันตัวช่วยสำหรับแสดงรูปโปรไฟล์ (ถ้าไม่มีรูประบบจะสุ่มสีอักษรย่อให้เหมือนเดิมค่ะ) ✨
 function getAvatarUrl(fullname, url) {
     if (url && url.trim() !== '') return url;
@@ -45,7 +161,7 @@ async function loginUsersSupabase() {
         localStorage.setItem('oms_user_session', JSON.stringify(data)); // ✨ เพิ่มบรรทัดนี้: จำการล็อกอินลงในเครื่อง
         
         document.getElementById("headerFullname").innerText = data.fullname;
-        document.getElementById("headerRole").innerText = data.role;
+        document.getElementById("headerRole").innerText = getUserOrganizationLabel(data);
         
         // ✨ อัปเดตรูปมุมขวาบน ✨
         const avatarCircle = document.getElementById("userAvatarCircle");
@@ -149,157 +265,241 @@ function changePage(pageNumber) {
 async function loadMyOTDashboardData() {
     if (!currentUser) return;
 
+    const searchInput = document.getElementById("searchInput");
+    if (searchInput) searchInput.value = "";
+
+    const tbody = document.getElementById("myOTRequestsTableBody");
+    if (!tbody) return;
+
+    myOTDashboardCurrentPage = 1;
+    myOTDashboardSearchTerm = "";
+    tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการคำขอ...</td></tr>`;
+
     try {
-        const { data: requests, error } = await supabaseClient
-            .from('ot_requests')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('submit_date', { ascending: false });
+        // ชุดข้อมูลทั้ง 3 ส่วนไม่ต้องรอกัน จึงโหลดพร้อมกันเพื่อลดเวลารวม
+        const [requestsResult, otTypesResult, profileResult] = await Promise.all([
+            supabaseClient
+                .from('ot_requests')
+                .select('id, ot_type_id, date_start, description, status, submit_date')
+                .eq('user_id', currentUser.id)
+                .order('submit_date', { ascending: false }),
+            supabaseClient.from('ot_types').select('id, rate, start_time, end_time').order('id', { ascending: true }),
+            supabaseClient.from('users').select('employee_id').eq('id', currentUser.id).single()
+        ]);
 
-        if (error) throw error;
+        if (requestsResult.error) throw requestsResult.error;
+        if (otTypesResult.error) throw otTypesResult.error;
 
-        const { data: otTypes } = await supabaseClient.from('ot_types').select('*');
+        const requests = requestsResult.data || [];
+        const otTypes = otTypesResult.data || [];
+        const latestUserProfile = profileResult.data;
+        if (latestUserProfile) currentUser.employee_id = latestUserProfile.employee_id;
 
-        // ✨ 1. ดึงข้อมูลสถานะการอนุมัติแต่ละขั้นตอนมาเตรียมไว้เช็ค
+        // ดึงเฉพาะสถานะขั้นอนุมัติของคำขอชุดนี้ เพื่อใช้ล็อกปุ่มแก้ไข/ลบตามกติกาเดิม
         let allSteps = [];
-        if (requests && requests.length > 0) {
+        if (requests.length > 0) {
             const reqIds = requests.map(r => r.id);
-            const { data: stepsData } = await supabaseClient.from('approval_steps').select('request_id, status').in('request_id', reqIds);
-            if (stepsData) allSteps = stepsData;
+            const { data: stepsData, error: stepsError } = await supabaseClient
+                .from('approval_steps')
+                .select('request_id, status')
+                .in('request_id', reqIds);
+
+            // หากอ่านสถานะไม่ได้ จะไม่แสดงปุ่มที่อาจอนุญาตให้แก้/ลบผิดกติกา
+            if (stepsError) throw stepsError;
+            allSteps = stepsData || [];
         }
 
-        const agencyMap = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
-        const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
-        
-        const agencyName = agencyMap[currentUser.agency] || currentUser.agency || '-';
-        const deptName = deptMap[currentUser.department] || currentUser.department || '-';
+        myOTDashboardRequests = requests;
+        myOTDashboardOTTypeMap = new Map(otTypes.map(otType => [otType.id, otType]));
+        myOTDashboardHasActionMap = new Map();
+        allSteps.forEach(step => {
+            if (step.status !== 'Pending') myOTDashboardHasActionMap.set(step.request_id, true);
+        });
 
         const pendingCount = requests.filter(r => r.status === 'Pending').length;
-        const approvedCount = requests.filter(r => r.status === 'Approved').length;
-        
         if(document.getElementById("statPendingCount")) document.getElementById("statPendingCount").innerText = pendingCount + " รายการ";
-        if(document.getElementById("statApprovedCount")) document.getElementById("statApprovedCount").innerText = approvedCount + " รายการ";
-        
-        let totalApprovedHours = 0;
-        requests.filter(r => r.status === 'Approved').forEach(r => {
-            const ot = (otTypes || []).find(t => t.id === r.ot_type_id);
-            if(ot) totalApprovedHours += parseFloat(calculateOTHours(ot.start_time, ot.end_time));
+
+        const currentPeriod = getCurrentOTPeriod(new Date());
+        const approvedCurrentPeriod = summarizeApprovedOTHours(requests, otTypes, request => {
+            const requestDate = parseOTRequestDate(request.date_start);
+            return requestDate && requestDate >= currentPeriod.start && requestDate <= currentPeriod.end;
         });
-        if(document.getElementById("statTotalHours")) document.getElementById("statTotalHours").innerText = totalApprovedHours.toFixed(2) + " ชม."; 
+        const approvedAllTime = summarizeApprovedOTHours(requests, otTypes);
 
-        const tbody = document.getElementById("myOTRequestsTableBody");
-        if (!tbody) return; 
-
-        tbody.innerHTML = "";
-        const pageInfo = document.getElementById("paginationInfoText");
-        const chartSection = document.getElementById("myOTChartsSection"); 
-
-        if (!requests || requests.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">ยังไม่มีการยื่นคำขอโอทีในระบบในขณะนี้ค่ะ 🍃</td></tr>`;
-            if(pageInfo) pageInfo.innerText = `แสดง 0 ถึง 0 จาก 0 แถว`;
-            if(chartSection) chartSection.classList.add("hidden"); 
-            return;
+        if (document.getElementById("approvedOTPeriodLabel")) {
+            document.getElementById("approvedOTPeriodLabel").innerText = `ชั่วโมง OT ที่อนุมัติรอบ ${formatOTPeriodDate(currentPeriod.start)} - ${formatOTPeriodDate(currentPeriod.end)}`;
         }
-
-        const otStats = {};
-        const approvedRequests = requests.filter(r => r.status === 'Approved');
-
-        if (approvedRequests.length > 0 && chartSection) {
-            chartSection.classList.remove("hidden"); 
-
-            approvedRequests.forEach(row => {
-                const otInfo = (otTypes || []).find(t => t.id === row.ot_type_id) || {};
-                const labelStr = otInfo.start_time ? `${otInfo.start_time}-${otInfo.end_time} (${otInfo.rate}x)` : row.ot_type_id;
-                
-                if (!otStats[labelStr]) otStats[labelStr] = 0;
-                
-                // ✨ ไนท์แก้จากเดิมที่บวก 1 มาเป็นการดึงฟังก์ชันคำนวณชั่วโมงมาบวกแทนค่ะ ✨
-                let hours = 0;
-                if (otInfo.start_time && otInfo.end_time) {
-                    hours = parseFloat(calculateOTHours(otInfo.start_time, otInfo.end_time));
-                }
-                otStats[labelStr] += hours; 
-            });
-
-            const chartLabels = Object.keys(otStats);
-            // ✨ ปัดเศษชั่วโมงให้เป็นทศนิยม 2 ตำแหน่ง กราฟจะได้ตัวเลขสวยๆ ค่ะ ✨
-            const chartCounts = chartLabels.map(l => parseFloat(otStats[l].toFixed(2)));
-            
-            drawMyOTCharts(chartLabels, chartCounts);
-        } else {
-            if(chartSection) chartSection.classList.add("hidden");
+        if (document.getElementById("statApprovedHoursThisMonth")) {
+            document.getElementById("statApprovedHoursThisMonth").innerText = `${approvedCurrentPeriod.totalHours.toFixed(2)} ชม.`;
         }
-
-        if(pageInfo) pageInfo.innerText = `แสดง 1 ถึง ${requests.length} จาก ${requests.length} แถว`;
-
-        requests.forEach(row => {
-            const otInfo = (otTypes || []).find(t => t.id === row.ot_type_id) || {};
-            const timeStr = otInfo.start_time ? `${otInfo.start_time} - ${otInfo.end_time}` : row.ot_type_id;
-            const hrsStr = otInfo.start_time ? `${calculateOTHours(otInfo.start_time, otInfo.end_time)} ชม.` : '-';
-
-            let badgeHTML = '';
-            if (row.status === 'Approved') badgeHTML = '<span class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600"><i class="bx bx-check-circle mr-1"></i>อนุมัติ</span>';
-            else if (row.status === 'Rejected') badgeHTML = '<span class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-red-100 text-red-600"><i class="bx bx-x-circle mr-1"></i>ไม่อนุมัติ</span>';
-            else badgeHTML = '<span class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-600"><i class="bx bx-time-five mr-1"></i>รออนุมัติ</span>';
-
-            let showDate = row.date_start;
-            if(showDate && showDate.includes('-')) {
-                const d = showDate.split('-');
-                showDate = `${d[2]}/${d[1]}/${d[0]}`; 
-            }
-
-            // ✨ 2. เช็คว่ามีขั้นตอนไหนถูกพิจารณาไปแล้วหรือยัง (ไม่เป็น Pending)
-        const rowSteps = allSteps.filter(s => s.request_id === row.id);
-        const hasAction = rowSteps.some(s => s.status !== 'Pending');
-        
-        // ถ้าระบบหลักปิดไปแล้ว หรือมีคนเริ่มพิจารณาแล้ว ให้ล็อกปุ่มทันที
-        const isDisable = (row.status === 'Approved' || row.status === 'Rejected' || hasAction);
-            
-            const btnView = `<button onclick="openOTDetailModal('${row.id}')" class="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm" title="ดูรายละเอียด"><i class='bx bx-show text-lg'></i></button>`;
-            
-            const btnEdit = isDisable 
-                ? `<button onclick="Swal.fire('แก้ไขไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅', 'warning')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="แก้ไขไม่ได้"><i class='bx bx-edit text-lg'></i></button>`
-                : `<button onclick="editMyOTRequest('${row.id}')" class="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors shadow-sm" title="แก้ไข"><i class='bx bx-edit text-lg'></i></button>`;
-                
-            const btnDelete = isDisable
-                ? `<button onclick="Swal.fire('ลบไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถลบได้ค่ะ 😅', 'warning')" class="w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="ลบไม่ได้"><i class='bx bx-trash text-lg'></i></button>`
-                : `<button onclick="deleteMyOTRequest('${row.id}')" class="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm" title="ลบ"><i class='bx bx-trash text-lg'></i></button>`;
-
-            const tr = document.createElement('tr');
-            tr.className = "hover:bg-slate-50 transition-colors duration-200";
-            tr.innerHTML = `
-                <td class="p-4 font-medium text-slate-700 text-center">${row.id}</td>
-                <td class="p-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 overflow-hidden flex-shrink-0 border border-slate-200 flex items-center justify-center">
-                            <!-- ✨ ใช้ getAvatarUrl ตรงนี้ ✨ -->
-                            <img src="${getAvatarUrl(currentUser.fullname, currentUser.avatar_url)}" class="w-full h-full object-cover">
-                        </div>
-                        <div>
-                            <p class="font-bold text-sm text-slate-800">${currentUser.fullname}</p>
-                            <p class="text-xs text-slate-500 mt-0.5">${agencyName} | ${deptName}</p>
-                        </div>
-                    </div>
-                </td>
-                <td class="p-4 text-slate-600 text-center">${timeStr}</td>
-                <td class="p-4 text-slate-600 text-center">${showDate}</td>
-                <td class="p-4 text-slate-600 text-center">${hrsStr}</td>
-                <td class="p-4 text-slate-600 truncate max-w-[150px] text-center" title="${row.description}">${row.description || '-'}</td>
-                <td class="p-4 text-center">${badgeHTML}</td>
-                <td class="p-4 text-center">
-                    <div class="flex items-center justify-center space-x-1.5">
-                        ${btnView}
-                        ${btnEdit}
-                        ${btnDelete}
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        if (document.getElementById("statTotalHours")) {
+            document.getElementById("statTotalHours").innerText = `${approvedAllTime.totalHours.toFixed(2)} ชม.`;
+        }
+        renderOTHoursBreakdown("monthlyApprovedTypeBreakdown", approvedCurrentPeriod, "text-green-600");
+        renderOTHoursBreakdown("totalApprovedTypeBreakdown", approvedAllTime, "text-blue-600");
+        renderMyOTRequestsPage();
 
     } catch (err) {
         console.error("Load Personal Dashboard Data Error:", err);
+        myOTDashboardRequests = [];
+        myOTDashboardOTTypeMap = new Map();
+        myOTDashboardHasActionMap = new Map();
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-500">โหลดข้อมูลหน้าแรกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</td></tr>`;
+        updateMyOTDashboardPagination(0, 0);
     }
+}
+
+function getFilteredMyOTDashboardRequests() {
+    if (!myOTDashboardSearchTerm) return myOTDashboardRequests;
+
+    const agencyName = AGENCY_NAME_MAP[currentUser?.agency] || currentUser?.agency || '-';
+    const departmentName = DEPARTMENT_NAME_MAP[currentUser?.department] || currentUser?.department || '-';
+
+    return myOTDashboardRequests.filter(request => {
+        const otType = myOTDashboardOTTypeMap.get(request.ot_type_id) || {};
+        const statusLabel = request.status === 'Approved'
+            ? 'อนุมัติ'
+            : request.status === 'Rejected'
+                ? 'ไม่อนุมัติ'
+                : 'รออนุมัติ';
+        const searchableText = [
+            request.id,
+            currentUser?.fullname,
+            currentUser?.employee_id,
+            agencyName,
+            departmentName,
+            request.description,
+            request.date_start,
+            request.status,
+            statusLabel,
+            otType.start_time,
+            otType.end_time
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return searchableText.includes(myOTDashboardSearchTerm);
+    });
+}
+
+function renderMyOTRequestsPage() {
+    const tbody = document.getElementById("myOTRequestsTableBody");
+    if (!tbody) return;
+
+    const filteredRequests = getFilteredMyOTDashboardRequests();
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / MY_OT_REQUESTS_PAGE_SIZE));
+    myOTDashboardCurrentPage = Math.min(Math.max(1, myOTDashboardCurrentPage), totalPages);
+
+    if (filteredRequests.length === 0) {
+        const message = myOTDashboardSearchTerm
+            ? 'ไม่พบรายการคำขอที่ตรงกับคำค้นหาค่ะ 🔎'
+            : 'ยังไม่มีการยื่นคำขอโอทีในระบบในขณะนี้ค่ะ 🍃';
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">${message}</td></tr>`;
+        updateMyOTDashboardPagination(0, 0);
+        return;
+    }
+
+    const startIndex = (myOTDashboardCurrentPage - 1) * MY_OT_REQUESTS_PAGE_SIZE;
+    const pageRequests = filteredRequests.slice(startIndex, startIndex + MY_OT_REQUESTS_PAGE_SIZE);
+    const agencyName = AGENCY_NAME_MAP[currentUser.agency] || currentUser.agency || '-';
+    const departmentName = DEPARTMENT_NAME_MAP[currentUser.department] || currentUser.department || '-';
+    const fragment = document.createDocumentFragment();
+
+    pageRequests.forEach(row => {
+        const otInfo = myOTDashboardOTTypeMap.get(row.ot_type_id) || {};
+        const timeStr = otInfo.start_time ? `${otInfo.start_time} - ${otInfo.end_time}` : row.ot_type_id;
+        const hrsStr = otInfo.start_time ? `${calculateOTHours(otInfo.start_time, otInfo.end_time)} ชม.` : '-';
+
+        let badgeHTML = '';
+        if (row.status === 'Approved') badgeHTML = '<span class="dashboard-status-approved px-3 py-1.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600"><i class="bx bx-check-circle mr-1"></i>อนุมัติ</span>';
+        else if (row.status === 'Rejected') badgeHTML = '<span class="dashboard-status-rejected px-3 py-1.5 rounded-full text-[11px] font-bold bg-red-100 text-red-600"><i class="bx bx-x-circle mr-1"></i>ไม่อนุมัติ</span>';
+        else badgeHTML = '<span class="dashboard-status-pending px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-600"><i class="bx bx-time-five mr-1"></i>รออนุมัติ</span>';
+
+        let showDate = row.date_start;
+        if (showDate && showDate.includes('-')) {
+            const dateParts = showDate.split('-');
+            showDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+        }
+
+        const hasAction = myOTDashboardHasActionMap.get(row.id) === true;
+        const isDisable = row.status === 'Approved' || row.status === 'Rejected' || hasAction;
+        const btnView = `<button onclick="openOTDetailModal('${row.id}')" class="dashboard-action-btn dashboard-btn-blue w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm" title="ดูรายละเอียด"><i class='bx bx-show text-lg'></i></button>`;
+        const btnEdit = isDisable
+            ? `<button onclick="Swal.fire('แก้ไขไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถแก้ไขได้ค่ะ 😅', 'warning')" class="dashboard-action-btn dashboard-btn-disabled w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="แก้ไขไม่ได้"><i class='bx bx-edit text-lg'></i></button>`
+            : `<button onclick="editMyOTRequest('${row.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors shadow-sm" title="แก้ไข"><i class='bx bx-edit text-lg'></i></button>`;
+        const btnDelete = isDisable
+            ? `<button onclick="Swal.fire('ลบไม่ได้', 'รายการนี้ได้รับการพิจารณาไปแล้ว ไม่สามารถลบได้ค่ะ 😅', 'warning')" class="dashboard-action-btn dashboard-btn-disabled w-8 h-8 rounded-lg bg-slate-300 text-white flex items-center justify-center cursor-not-allowed shadow-sm" title="ลบไม่ได้"><i class='bx bx-trash text-lg'></i></button>`
+            : `<button onclick="deleteMyOTRequest('${row.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm" title="ลบ"><i class='bx bx-trash text-lg'></i></button>`;
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition-colors duration-200";
+        tr.innerHTML = `
+            <td class="p-4 font-medium text-slate-700 text-center">${row.id}</td>
+            <td class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 sm:w-16 sm:h-16 rounded-full bg-slate-100 text-slate-400 overflow-hidden flex-shrink-0 border border-slate-200 flex items-center justify-center shadow-sm">
+                        <img src="${getAvatarUrl(currentUser.fullname, currentUser.avatar_url)}" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <p class="font-bold text-sm text-slate-800">${currentUser.fullname}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">${agencyName} | ${departmentName}</p>
+                    </div>
+                </div>
+            </td>
+            <td class="p-4 text-slate-700 text-center font-bold whitespace-nowrap">${currentUser.employee_id || '-'}</td>
+            <td class="p-4 text-slate-600 text-center">${timeStr}</td>
+            <td class="p-4 text-slate-600 text-center">${showDate}</td>
+            <td class="p-4 text-slate-600 text-center">${hrsStr}</td>
+            <td class="p-4 text-slate-600 truncate max-w-[150px] text-center" title="${row.description || '-'}">${row.description || '-'}</td>
+            <td class="p-4 text-center">${badgeHTML}</td>
+            <td class="p-4 text-center">
+                <div class="flex items-center justify-center space-x-1.5">
+                    ${btnView}
+                    ${btnEdit}
+                    ${btnDelete}
+                </div>
+            </td>
+        `;
+        fragment.appendChild(tr);
+    });
+
+    tbody.innerHTML = "";
+    tbody.appendChild(fragment);
+    updateMyOTDashboardPagination(filteredRequests.length, totalPages);
+}
+
+function updateMyOTDashboardPagination(totalItems, totalPages) {
+    const pageInfo = document.getElementById("paginationInfoText");
+    const currentPageButton = document.getElementById("myOTCurrentPageButton");
+    const startItem = totalItems === 0 ? 0 : (myOTDashboardCurrentPage - 1) * MY_OT_REQUESTS_PAGE_SIZE + 1;
+    const endItem = totalItems === 0 ? 0 : Math.min(myOTDashboardCurrentPage * MY_OT_REQUESTS_PAGE_SIZE, totalItems);
+
+    if (pageInfo) pageInfo.innerText = `แสดง ${startItem} ถึง ${endItem} จาก ${totalItems} แถว`;
+    if (currentPageButton) currentPageButton.innerText = totalItems === 0 ? '1' : String(myOTDashboardCurrentPage);
+
+    const isFirstPage = totalItems === 0 || myOTDashboardCurrentPage <= 1;
+    const isLastPage = totalItems === 0 || myOTDashboardCurrentPage >= totalPages;
+    ["myOTFirstPageButton", "myOTPreviousPageButton"].forEach(id => setMyOTPaginationButtonState(id, isFirstPage));
+    ["myOTNextPageButton", "myOTLastPageButton"].forEach(id => setMyOTPaginationButtonState(id, isLastPage));
+}
+
+function setMyOTPaginationButtonState(buttonId, disabled) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+
+    button.disabled = disabled;
+    button.classList.toggle('opacity-40', disabled);
+    button.classList.toggle('cursor-not-allowed', disabled);
+}
+
+function changeMyOTDashboardPage(action) {
+    const filteredRequests = getFilteredMyOTDashboardRequests();
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / MY_OT_REQUESTS_PAGE_SIZE));
+
+    if (action === 'first') myOTDashboardCurrentPage = 1;
+    else if (action === 'previous') myOTDashboardCurrentPage = Math.max(1, myOTDashboardCurrentPage - 1);
+    else if (action === 'next') myOTDashboardCurrentPage = Math.min(totalPages, myOTDashboardCurrentPage + 1);
+    else if (action === 'last') myOTDashboardCurrentPage = totalPages;
+
+    renderMyOTRequestsPage();
 }
 
 function drawMyOTCharts(labels, counts) {
@@ -365,123 +565,170 @@ function drawMyOTCharts(labels, counts) {
 async function loadApprovalQueueData() {
     if (!currentUser) return;
 
+    const tbody = document.getElementById("approvalQueueTableBody");
+    if (!tbody) return;
+
+    const selectAllCheckbox = document.getElementById("selectAllCheckbox");
+    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+    const showEmptyState = () => {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400">ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨</td></tr>`;
+    };
+
+    tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการรออนุมัติ...</td></tr>`;
+
     try {
         const { data: myPendingSteps, error: stepErr } = await supabaseClient
             .from('approval_steps')
-            .select('*')
+            .select('id, request_id, step_order')
             .eq('approver_id', currentUser.id)
             .eq('status', 'Pending');
 
         if (stepErr) throw stepErr;
 
-        const tbody = document.getElementById("approvalQueueTableBody");
-        tbody.innerHTML = "";
-
         if (!myPendingSteps || myPendingSteps.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨</td></tr>`;
+            showEmptyState();
             return;
         }
 
-        for (const step of myPendingSteps) {
-            const { data: allSteps, error: allErr } = await supabaseClient
-                .from('approval_steps')
-                .select('*')
-                .eq('request_id', step.request_id);
-
-            if (allErr) continue;
-
-            const previousStepsApproved = allSteps
-                .filter(s => s.step_order < step.step_order)
-                .every(s => s.status === 'Approved');
-
-            if (previousStepsApproved) {
-                // 1. ดึงข้อมูลคำขอ OT
-                const { data: request, error: reqErr } = await supabaseClient
-                    .from('ot_requests')
-                    .select('*')
-                    .eq('id', step.request_id)
-                    .single();
-
-                if (reqErr) continue;
-
-                // 2. ดึงข้อมูลพนักงาน (เพื่อเอารูป ชื่อ และตำแหน่ง/ฝ่าย)
-                const { data: userData } = await supabaseClient
-                    .from('users')
-                    .select('fullname, avatar_url, role, department')
-                    .eq('id', request.user_id)
-                    .single();
-
-                // 3. ดึงข้อมูลประเภท OT (เพื่อเอาเรตตัวคูณและเวลาทำงาน)
-                const { data: otTypeData } = await supabaseClient
-                    .from('ot_types')
-                    .select('rate, start_time, end_time')
-                    .eq('id', request.ot_type_id)
-                    .single();
-
-                // แมปชื่อฝ่ายให้แสดงผลเป็นภาษาไทยสวยๆ ค่ะ
-                const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
-                
-                // เตรียมตัวแปรสำหรับแสดงผลในตาราง
-                const empName = userData ? userData.fullname : request.user_id;
-                const empAvatar = getAvatarUrl(empName, userData?.avatar_url);
-                const empRole = userData ? userData.role : '-';
-                const empDept = userData ? (deptMap[userData.department] || userData.department) : '-';
-                
-                const otRate = otTypeData ? `โอที (${otTypeData.rate}) เท่า` : '-';
-                const otTime = otTypeData ? `${otTypeData.start_time} - ${otTypeData.end_time}` : '-';
-
-                // แปลงรูปแบบวันที่จาก YYYY-MM-DD เป็น DD/MM/YYYY ตามที่พี่ต้นต้องการค่ะ
-                let showDate = request.date_start;
-                if(showDate && showDate.includes('-')) {
-                    const d = showDate.split('-');
-                    showDate = `${d[2]}/${d[1]}/${d[0]}`; 
-                }
-
-                // ป้าย Badge สถานะรออนุมัติ
-                const statusBadge = '<span class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-600"><i class="bx bx-hourglass mr-1"></i>รออนุมัติ</span>';
-
-                // สร้างโครงสร้างแถวตาราง (Row)
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0";
-                tr.innerHTML = `
-                    <td class="p-3 text-center">
-                        <input type="checkbox" class="rowCheckbox w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer" 
-                               value="${step.id}" 
-                               data-request-id="${request.id}" 
-                               data-step-order="${step.step_order}" 
-                               data-total-steps="${allSteps.length}">
-                    </td>
-                    <td class="p-3 font-semibold text-slate-700 text-center">${request.id}</td>
-                    
-                    <td class="p-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
-                                <img src="${empAvatar}" class="w-full h-full object-cover">
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold text-slate-700">${empName}</p>
-                                <p class="text-[11px] text-slate-400">${empRole} | ${empDept}</p>
-                            </div>
-                        </div>
-                    </td>
-                    
-                    <td class="p-3 text-slate-600 text-center font-medium">${otRate}</td>
-                    <td class="p-3 text-slate-600 text-center">${showDate}</td>
-                    <td class="p-3 text-slate-600 text-center">${otTime}</td>
-                    <td class="p-3 text-slate-600 text-center truncate max-w-[120px]" title="${request.description}">${request.description || '-'}</td>
-                    <td class="p-3 text-center">${statusBadge}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="openOTDetailModal('${request.id}')" class="px-3 py-1.5 bg-blue-500 text-white text-xs font-semibold rounded-lg hover:bg-blue-600 shadow-sm transition-transform hover:scale-105 flex items-center justify-center mx-auto">
-                            <i class='bx bx-show mr-1'></i> ดูรายละเอียด
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            }
+        const requestIds = [...new Set(myPendingSteps.map(step => step.request_id).filter(Boolean))];
+        if (requestIds.length === 0) {
+            showEmptyState();
+            return;
         }
 
+        // ดึงขั้นอนุมัติและคำขอทั้งหมดเป็นชุด แทนการ Query ทีละแถว
+        const [allStepsResult, requestsResult] = await Promise.all([
+            supabaseClient
+                .from('approval_steps')
+                .select('request_id, step_order, status')
+                .in('request_id', requestIds),
+            supabaseClient
+                .from('ot_requests')
+                .select('id, user_id, ot_type_id, date_start, description')
+                .in('id', requestIds)
+        ]);
+
+        if (allStepsResult.error) throw allStepsResult.error;
+        if (requestsResult.error) throw requestsResult.error;
+
+        const stepsByRequest = new Map();
+        (allStepsResult.data || []).forEach(step => {
+            if (!stepsByRequest.has(step.request_id)) stepsByRequest.set(step.request_id, []);
+            stepsByRequest.get(step.request_id).push(step);
+        });
+
+        const eligibleSteps = myPendingSteps.filter(step => {
+            const requestSteps = stepsByRequest.get(step.request_id) || [];
+            return requestSteps
+                .filter(item => Number(item.step_order) < Number(step.step_order))
+                .every(item => item.status === 'Approved');
+        });
+
+        if (eligibleSteps.length === 0) {
+            showEmptyState();
+            return;
+        }
+
+        const requestMap = new Map((requestsResult.data || []).map(request => [request.id, request]));
+        const eligibleRequests = eligibleSteps
+            .map(step => requestMap.get(step.request_id))
+            .filter(Boolean);
+        const userIds = [...new Set(eligibleRequests.map(request => request.user_id).filter(Boolean))];
+        const otTypeIds = [...new Set(eligibleRequests.map(request => request.ot_type_id).filter(Boolean))];
+
+        const emptyResult = Promise.resolve({ data: [], error: null });
+        const [usersResult, otTypesResult] = await Promise.all([
+            userIds.length > 0
+                ? supabaseClient
+                    .from('users')
+                    .select('id, fullname, avatar_url, role, department')
+                    .in('id', userIds)
+                : emptyResult,
+            otTypeIds.length > 0
+                ? supabaseClient
+                    .from('ot_types')
+                    .select('id, rate, start_time, end_time')
+                    .in('id', otTypeIds)
+                : emptyResult
+        ]);
+
+        if (usersResult.error) console.warn("Load approval users warning:", usersResult.error);
+        if (otTypesResult.error) console.warn("Load approval OT types warning:", otTypesResult.error);
+
+        const userMap = new Map((usersResult.data || []).map(user => [user.id, user]));
+        const otTypeMap = new Map((otTypesResult.data || []).map(otType => [otType.id, otType]));
+        const fragment = document.createDocumentFragment();
+
+        eligibleSteps.forEach(step => {
+            const request = requestMap.get(step.request_id);
+            if (!request) return;
+
+            const allSteps = stepsByRequest.get(step.request_id) || [];
+            const userData = userMap.get(request.user_id);
+            const otTypeData = otTypeMap.get(request.ot_type_id);
+
+            const empName = userData ? userData.fullname : request.user_id;
+            const empAvatar = getAvatarUrl(empName, userData?.avatar_url);
+            const empRole = userData ? userData.role : '-';
+            const empDept = userData ? (DEPARTMENT_NAME_MAP[userData.department] || userData.department) : '-';
+
+            const otRate = otTypeData ? `โอที (${otTypeData.rate}) เท่า` : '-';
+            const otTime = otTypeData ? `${otTypeData.start_time} - ${otTypeData.end_time}` : '-';
+
+            // แปลงรูปแบบวันที่จาก YYYY-MM-DD เป็น DD/MM/YYYY ตามรูปแบบเดิมของหน้านี้
+            let showDate = request.date_start;
+            if (showDate && showDate.includes('-')) {
+                const d = showDate.split('-');
+                showDate = `${d[2]}/${d[1]}/${d[0]}`;
+            }
+
+            const statusBadge = '<span class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-600"><i class="bx bx-hourglass mr-1"></i>รออนุมัติ</span>';
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0";
+            tr.innerHTML = `
+                <td class="p-3 text-center">
+                    <input type="checkbox" class="rowCheckbox w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                           value="${step.id}"
+                           data-request-id="${request.id}"
+                           data-step-order="${step.step_order}"
+                           data-total-steps="${allSteps.length}">
+                </td>
+                <td class="p-3 font-semibold text-slate-700 text-center">${request.id}</td>
+
+                <td class="p-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 lg:w-14 lg:h-14 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
+                            <img src="${empAvatar}" loading="lazy" decoding="async" class="w-full h-full object-cover object-top">
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-700">${empName}</p>
+                            <p class="text-[11px] text-slate-400">${empRole} | ${empDept}</p>
+                        </div>
+                    </div>
+                </td>
+
+                <td class="p-3 text-slate-600 text-center font-medium">${otRate}</td>
+                <td class="p-3 text-slate-600 text-center">${showDate}</td>
+                <td class="p-3 text-slate-600 text-center">${otTime}</td>
+                <td class="p-3 text-slate-600 text-center truncate max-w-[120px]" title="${request.description}">${request.description || '-'}</td>
+                <td class="p-3 text-center">${statusBadge}</td>
+                <td class="p-3 text-center">
+                    <button onclick="openOTDetailModal('${request.id}')" class="px-3 py-1.5 bg-blue-500 text-white text-xs font-semibold rounded-lg hover:bg-blue-600 shadow-sm transition-transform hover:scale-105 flex items-center justify-center mx-auto">
+                        <i class='bx bx-show mr-1'></i> ดูรายละเอียด
+                    </button>
+                </td>
+            `;
+            fragment.appendChild(tr);
+        });
+
+        tbody.innerHTML = "";
+        tbody.appendChild(fragment);
+
+        if (!tbody.querySelector('tr')) showEmptyState();
     } catch (err) {
         console.error("Load Approval Queue Error:", err);
+        tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-red-500">โหลดรายการรออนุมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</td></tr>`;
     }
 }
 
@@ -586,12 +833,12 @@ async function loadOTTypesCards() {
             card.dataset.id = ot.id;
             
             card.innerHTML = `
-                <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-xl mb-2">
+                <div class="ot-card-icon w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-xl mb-2">
                     <i class='bx bx-briefcase-alt-2'></i>
                 </div>
-                <span class="font-bold text-slate-700 text-sm">${ot.start_time} - ${ot.end_time}</span>
-                <span class="text-xs text-slate-500 mt-1">โอที (${ot.rate}) เท่า</span>
-                <span class="text-[11px] font-semibold text-slate-400 mt-1 bg-slate-100 px-2 py-0.5 rounded-full">รวม ${actualHours} ชม.</span>
+                <span class="ot-card-title font-bold text-slate-700 text-sm">${ot.start_time} - ${ot.end_time}</span>
+                <span class="ot-card-rate text-xs text-slate-500 mt-1">โอที (${ot.rate}) เท่า</span>
+                <span class="ot-card-hours text-[11px] font-semibold text-slate-400 mt-1 bg-slate-100 px-2 py-0.5 rounded-full">รวม ${actualHours} ชม.</span>
                 
                 <div class="check-icon absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full text-white flex items-center justify-center opacity-0 scale-50 transition-all duration-200">
                     <i class='bx bx-check text-sm'></i>
@@ -600,6 +847,7 @@ async function loadOTTypesCards() {
 
             card.addEventListener('click', () => {
                 document.querySelectorAll('.ot-card').forEach(c => {
+                    c.classList.remove('ot-card-selected');
                     c.classList.remove('border-blue-500', 'bg-blue-50');
                     c.classList.add('border-slate-100', 'bg-white');
                     c.querySelector('.check-icon').classList.remove('opacity-100', 'scale-100');
@@ -608,6 +856,7 @@ async function loadOTTypesCards() {
                 
                 card.classList.remove('border-slate-100', 'bg-white');
                 card.classList.add('border-blue-500', 'bg-blue-50');
+                card.classList.add('ot-card-selected');
                 card.querySelector('.check-icon').classList.remove('opacity-0', 'scale-50');
                 card.querySelector('.check-icon').classList.add('opacity-100', 'scale-100');
                 
@@ -674,7 +923,7 @@ function renderApproversGrid(approvers, container) {
         const isSelectedIdx = tempSelectedApprovers.findIndex(s => s.id === u.id);
         const isSelected = isSelectedIdx >= 0;
         
-        const activeClasses = isSelected ? 'border-green-500 bg-green-50/60 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-400 hover:shadow-sm';
+        const activeClasses = isSelected ? 'approver-card-selected border-green-500 bg-green-50/60 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-400 hover:shadow-sm';
         const iconOpacity = isSelected ? 'opacity-100 scale-100' : 'opacity-0 scale-50';
         const badgeStr = isSelected ? `<div class="absolute -top-2 -left-2 w-6 h-6 bg-amber-500 text-white rounded-full text-xs font-bold flex items-center justify-center border-2 border-white z-10 shadow-sm">${isSelectedIdx + 1}</div>` : '';
         
@@ -687,16 +936,16 @@ function renderApproversGrid(approvers, container) {
         }
 
         const card = document.createElement('div');
-        card.className = `relative flex items-center p-3 rounded-xl border-2 cubic-bezier(0.4, 0, 0.2, 1) duration-200 cursor-pointer transition-all ${activeClasses}`;
+        card.className = `approver-card relative flex items-center p-3 md:p-4 rounded-xl border-2 cubic-bezier(0.4, 0, 0.2, 1) duration-200 cursor-pointer transition-all ${activeClasses}`;
         card.innerHTML = `
             ${badgeStr}
-            <div class="w-11 h-11 rounded-full bg-slate-50 text-slate-400 overflow-hidden flex-shrink-0 mr-3 border border-slate-200 flex items-center justify-center text-xl shadow-inner">
+            <div class="approver-avatar w-11 h-11 md:w-14 md:h-14 rounded-full bg-slate-50 text-slate-400 overflow-hidden flex-shrink-0 mr-3 border border-slate-200 flex items-center justify-center text-xl shadow-inner">
                 <!-- ✨ ใช้ getAvatarUrl ตรงนี้ ✨ -->
                 <img src="${getAvatarUrl(u.fullname, u.avatar_url)}" class="w-full h-full object-cover">
             </div>
             <div class="flex-grow min-w-0 pr-2">
-                <p class="font-bold text-sm text-slate-800 truncate">${u.fullname}</p>
-                <p class="text-[12px] text-slate-500 truncate mt-0.5">${subText}</p>
+                <p class="approver-card-name font-bold text-sm text-slate-800 truncate">${u.fullname}</p>
+                <p class="approver-card-meta text-[12px] text-slate-500 truncate mt-0.5">${subText}</p>
             </div>
             <div class="w-6 h-6 bg-green-500 rounded-full text-white flex items-center justify-center flex-shrink-0 transition-all ${iconOpacity}">
                 <i class='bx bx-check text-sm'></i>
@@ -798,9 +1047,9 @@ function confirmApproverSelection() {
 
     finalSelectedApprovers.forEach((u, idx) => {
         chipContainer.innerHTML += `
-            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
+            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
                 <span class="w-5 h-5 bg-amber-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center mr-2">${idx + 1}</span>
-                <span class="text-sm font-semibold text-slate-700 mr-1">${u.fullname}</span>
+                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 mr-1">${u.fullname}</span>
             </div>
         `;
     });
@@ -947,54 +1196,78 @@ function logoutUsers() {
 async function openOTDetailModal(reqId) {
     const modal = document.getElementById('otDetailModal');
     const loading = document.getElementById('modalLoading');
-    
+    const requestToken = ++otDetailRequestToken;
+
     modal.classList.remove('hidden');
-    loading.classList.remove('hidden'); 
+    loading.classList.remove('hidden');
 
     try {
         const { data: reqData, error: reqErr } = await supabaseClient
-            .from('ot_requests').select('*').eq('id', reqId).single();
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, description, status')
+            .eq('id', reqId)
+            .single();
         if (reqErr) throw reqErr;
+        if (requestToken !== otDetailRequestToken) return;
 
-        const { data: userData } = await supabaseClient
-            .from('users').select('*').eq('id', reqData.user_id).single();
+        // ข้อมูลทั้ง 3 ส่วนอาศัยเฉพาะ reqData จึงโหลดพร้อมกันได้
+        const [userResult, otTypeResult, stepsResult] = await Promise.all([
+            supabaseClient
+                .from('users')
+                .select('fullname, avatar_url, agency, department')
+                .eq('id', reqData.user_id)
+                .single(),
+            supabaseClient
+                .from('ot_types')
+                .select('start_time, end_time, rate')
+                .eq('id', reqData.ot_type_id)
+                .single(),
+            supabaseClient
+                .from('approval_steps')
+                .select('approver_id, step_order, status, approved_at, comment')
+                .eq('request_id', reqId)
+                .order('step_order', { ascending: true })
+        ]);
 
-        const { data: otType } = await supabaseClient
-            .from('ot_types').select('*').eq('id', reqData.ot_type_id).single();
+        if (requestToken !== otDetailRequestToken) return;
+        if (stepsResult.error) throw stepsResult.error;
+        if (userResult.error) console.warn('Load OT detail user warning:', userResult.error);
+        if (otTypeResult.error) console.warn('Load OT detail type warning:', otTypeResult.error);
 
-        const { data: stepsData } = await supabaseClient
-            .from('approval_steps').select('*').eq('request_id', reqId).order('step_order', { ascending: true });
+        const userData = userResult.data;
+        const otType = otTypeResult.data;
+        const stepsData = stepsResult.data || [];
+        const approverIds = [...new Set(stepsData.map(step => step.approver_id).filter(Boolean))];
+        const approversResult = approverIds.length > 0
+            ? await supabaseClient.from('users').select('id, fullname').in('id', approverIds)
+            : { data: [], error: null };
 
-        // ✨ ใช้ getAvatarUrl ตรงนี้ ✨
+        if (requestToken !== otDetailRequestToken) return;
+        if (approversResult.error) console.warn('Load OT detail approvers warning:', approversResult.error);
+        const approverMap = new Map((approversResult.data || []).map(approver => [approver.id, approver.fullname]));
+
         const avatarUrl = getAvatarUrl(userData?.fullname, userData?.avatar_url);
         document.getElementById('modalEmpImage').src = avatarUrl;
         document.getElementById('modalEmpName').innerText = userData?.fullname || reqData.user_id;
-        // แมปชื่อหน่วยงานและฝ่ายให้เป็นชื่อเต็ม
-        const agencyMap = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
-        const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
+        const agencyName = AGENCY_NAME_MAP[userData?.agency] || userData?.agency || '-';
+        const deptName = DEPARTMENT_NAME_MAP[userData?.department] || userData?.department || '-';
 
-        const agencyName = agencyMap[userData?.agency] || userData?.agency || '-';
-        const deptName = deptMap[userData?.department] || userData?.department || '-';
-
-        // ✨ แก้ไขที่ 1: เปลี่ยนมาใช้ innerHTML และใส่ <br> เพื่อดันฝ่ายลงบรรทัดใหม่
         document.getElementById('modalEmpDept').innerHTML = `หน่วยงาน: ${agencyName} <br> ฝ่าย: ${deptName}`;
-
         document.getElementById('modalReqId').innerText = reqData.id;
-        
-        // ✨ แก้ไขที่ 2: แปลงรูปแบบวันที่จาก YYYY-MM-DD เป็น DD/MM/YYYY
+
         let showDate = reqData.date_start;
-        if(showDate && showDate.includes('-')) {
+        if (showDate && showDate.includes('-')) {
             const d = showDate.split('-');
-            showDate = `${d[2]}/${d[1]}/${d[0]}`; 
+            showDate = `${d[2]}/${d[1]}/${d[0]}`;
         }
         document.getElementById('modalDate').innerText = showDate;
         document.getElementById('modalDesc').innerText = reqData.description || '-';
-        
-        if (otType) {
-            document.getElementById('modalTime').innerText = `${otType.start_time} - ${otType.end_time}`;
-            document.getElementById('modalRate').innerText = `${otType.rate} เท่า`;
-            document.getElementById('modalTotalHours').innerText = `${calculateOTHours(otType.start_time, otType.end_time)} ชม.`;
-        }
+
+        document.getElementById('modalTime').innerText = otType ? `${otType.start_time} - ${otType.end_time}` : '-';
+        document.getElementById('modalRate').innerText = otType ? `${otType.rate} เท่า` : '-';
+        document.getElementById('modalTotalHours').innerText = otType
+            ? `${calculateOTHours(otType.start_time, otType.end_time)} ชม.`
+            : '-';
 
         let mainBadge = '';
         if (reqData.status === 'Approved') mainBadge = '<span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-bold">อนุมัติเรียบร้อย</span>';
@@ -1004,31 +1277,26 @@ async function openOTDetailModal(reqId) {
 
         const timelineContainer = document.getElementById('modalTimeline');
         timelineContainer.innerHTML = '';
-        
-        if (stepsData && stepsData.length > 0) {
-            const approverIds = stepsData.map(s => s.approver_id);
-            const { data: approvers } = await supabaseClient.from('users').select('id, fullname').in('id', approverIds);
-            
-            stepsData.forEach((step) => {
-                const approverName = approvers?.find(a => a.id === step.approver_id)?.fullname || step.approver_id;
-                
-                // ✨ โค้ดแปลงวันที่และเวลา: จัดฟอร์แมต ค.ศ. และต่อท้ายด้วยเวลา ✨
+
+        if (stepsData.length > 0) {
+            timelineContainer.innerHTML = stepsData.map(step => {
+                const approverName = approverMap.get(step.approver_id) || step.approver_id;
                 let displayDate = step.approved_at || '-';
                 if (displayDate !== '-' && displayDate.includes('/')) {
-                    let [datePart, timePart] = displayDate.split(' : '); // แยกวันที่กับเวลาออกจากกัน
-                    let parts = datePart.trim().split('/');
-                    let d = parts[0].padStart(2, '0'); 
-                    let m = parts[1].padStart(2, '0'); 
+                    const [datePart, timePart] = displayDate.split(' : ');
+                    const parts = datePart.trim().split('/');
+                    const d = parts[0].padStart(2, '0');
+                    const m = parts[1].padStart(2, '0');
                     let y = parseInt(parts[2]);
-                    if (y > 2500) y -= 543; 
-                    
+                    if (y > 2500) y -= 543;
+
                     displayDate = `${d}/${m}/${y}`;
-                    if (timePart) displayDate += ` : ${timePart}`; // ถ้ามีเวลาให้เอามาต่อท้าย
+                    if (timePart) displayDate += ` : ${timePart}`;
                 }
-                
+
                 let iconColor = 'bg-slate-200 text-slate-400';
                 let statusText = '<span class="text-slate-500 text-xs">รอคิวพิจารณา</span>';
-                
+
                 if (step.status === 'Approved') {
                     iconColor = 'bg-green-500 text-white';
                     statusText = `<span class="text-green-600 text-xs font-bold">อนุมัติแล้ว (${displayDate})</span>`;
@@ -1040,11 +1308,11 @@ async function openOTDetailModal(reqId) {
                     statusText = '<span class="text-amber-500 text-xs font-bold">กำลังรอพิจารณา</span>';
                 }
 
-                const commentHtml = step.comment && step.comment !== '-' 
-                    ? `<p class="text-xs text-slate-600 mt-1.5 bg-slate-100 p-2 rounded-lg border border-slate-200"><i class='bx bx-message-rounded-dots mr-1 text-slate-400'></i>หมายเหตุ: ${step.comment}</p>` 
+                const commentHtml = step.comment && step.comment !== '-'
+                    ? `<p class="text-xs text-slate-600 mt-1.5 bg-slate-100 p-2 rounded-lg border border-slate-200"><i class='bx bx-message-rounded-dots mr-1 text-slate-400'></i>หมายเหตุ: ${step.comment}</p>`
                     : '';
 
-                const stepHtml = `
+                return `
                     <div class="relative pl-8 pb-4 border-l-2 border-slate-100 last:border-0 last:pb-0">
                         <div class="absolute -left-[13px] top-0 w-6 h-6 rounded-full ${iconColor} flex items-center justify-center text-[10px] font-bold shadow-sm">
                             ${step.step_order}
@@ -1056,21 +1324,23 @@ async function openOTDetailModal(reqId) {
                         </div>
                     </div>
                 `;
-                timelineContainer.innerHTML += stepHtml;
-            });
+            }).join('');
         }
 
     } catch (err) {
+        if (requestToken !== otDetailRequestToken) return;
         console.error("Error loading OT details:", err);
         Swal.fire('ข้อผิดพลาด', 'ดึงข้อมูลไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
         modal.classList.add('hidden');
     } finally {
-        loading.classList.add('hidden'); 
+        if (requestToken === otDetailRequestToken) loading.classList.add('hidden');
     }
 }
 
 function closeOTDetailModal() {
+    otDetailRequestToken++;
     document.getElementById('otDetailModal').classList.add('hidden');
+    document.getElementById('modalLoading').classList.add('hidden');
 }
 
 function toggleAllCheckboxes(source) {
@@ -1122,57 +1392,80 @@ async function bulkApproveSteps(action) {
     });
 
     try {
-        const approvedPayloadData = []; // ✨ ตัวแปรใหม่สำหรับมัดรวมข้อมูลส่งเมล
+        // ใช้เฉพาะ Checkbox ที่ถูกเลือก จึงรองรับทั้งเลือกบางรายการและเลือกทั้งหมด
+        const selectedItems = Array.from(checkboxes).map(cb => ({
+            checkbox: cb,
+            stepId: cb.value,
+            requestId: cb.dataset.requestId,
+            currentOrder: Number(cb.dataset.stepOrder),
+            totalSteps: Number(cb.dataset.totalSteps)
+        }));
+        const stepIds = [...new Set(selectedItems.map(item => item.stepId).filter(Boolean))];
+        const now = new Date();
+        const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-        for (let cb of checkboxes) {
-            const stepId = cb.value;
-            const requestId = cb.dataset.requestId;
-            const currentOrder = parseInt(cb.dataset.stepOrder);
-            const totalSteps = parseInt(cb.dataset.totalSteps);
+        // อัปเดตขั้นอนุมัติที่ถูกเลือกทั้งหมดในคำสั่งเดียว
+        const { error: stepsUpdateError } = await supabaseClient
+            .from('approval_steps')
+            .update({
+                status: action,
+                approved_at: timestampStr,
+                comment: reasonInput.trim()
+            })
+            .in('id', stepIds);
 
-            const now = new Date();
-const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        if (stepsUpdateError) throw stepsUpdateError;
 
-await supabaseClient
-    .from('approval_steps')
-    .update({ 
-        status: action, 
-        approved_at: timestampStr,
-        comment: reasonInput.trim()
-    })
-    .eq('id', stepId);
-
-            if (action === 'Rejected') {
-                await supabaseClient.from('ot_requests').update({ status: 'Rejected' }).eq('id', requestId);
-            } else if (action === 'Approved' && currentOrder === totalSteps) {
-                await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
+        // อัปเดตสถานะคำขอเป็นชุด เฉพาะรายการที่ต้องปิด Workflow เท่านั้น
+        const requestUpdatePromises = [];
+        if (action === 'Rejected') {
+            const rejectedRequestIds = [...new Set(selectedItems.map(item => item.requestId).filter(Boolean))];
+            if (rejectedRequestIds.length > 0) {
+                requestUpdatePromises.push(
+                    supabaseClient.from('ot_requests').update({ status: 'Rejected' }).in('id', rejectedRequestIds)
+                );
             }
-            
-            // ✨ ดึงข้อมูลพนักงานเฉพาะคนที่ "ผ่านการอนุมัติ" เพื่อส่ง Webhook ✨
-            if (action === 'Approved') {
-                const tr = cb.closest('tr'); // ดึงข้อมูลจากแถวที่ติ๊กถูก
+        } else if (action === 'Approved') {
+            const finalApprovedRequestIds = [...new Set(
+                selectedItems
+                    .filter(item => item.currentOrder === item.totalSteps)
+                    .map(item => item.requestId)
+                    .filter(Boolean)
+            )];
+            if (finalApprovedRequestIds.length > 0) {
+                requestUpdatePromises.push(
+                    supabaseClient.from('ot_requests').update({ status: 'Approved' }).in('id', finalApprovedRequestIds)
+                );
+            }
+        }
+
+        const requestUpdateResults = await Promise.all(requestUpdatePromises);
+        const requestUpdateError = requestUpdateResults.find(result => result.error)?.error;
+        if (requestUpdateError) throw requestUpdateError;
+
+        const approvedPayloadData = action === 'Approved'
+            ? selectedItems.map(item => {
+                const tr = item.checkbox.closest('tr');
                 const empName = tr.querySelector('.font-bold.text-slate-700').innerText;
                 const otDate = tr.cells[4].innerText;
                 const otHoursStr = tr.cells[5].innerText;
-
-                // แปลงเวลาให้เป็นจำนวนชั่วโมง
                 let hrs = 0;
+
                 if (otHoursStr.includes('-')) {
-                    const [start, end] = otHoursStr.split('-').map(s => s.trim());
+                    const [start, end] = otHoursStr.split('-').map(value => value.trim());
                     hrs = calculateOTHours(start, end);
                 }
 
-                // ✨ แก้ไขส่วนนี้ในฟังก์ชัน bulkApproveSteps ✨
-                approvedPayloadData.push({
-                user_id: currentUser.id, 
-                approver_name: currentUser.fullname, // ✨ ไนท์เพิ่มบรรทัดนี้ เพื่อส่งชื่อของคนที่กำลังล็อกอินไปให้ GAS ค่ะ
-                emp_id: tr.querySelector('.font-semibold').innerText, 
-                fullname: empName,
-                date: otDate,
-                hours: hrs
-            });
-            }
-        }
+                return {
+                    user_id: currentUser.id,
+                    approver_name: currentUser.fullname,
+                    emp_id: tr.querySelector('.font-semibold').innerText,
+                    fullname: empName,
+                    date: otDate,
+                    hours: hrs
+                };
+            })
+            : [];
 
         // ✨ ยิง Webhook แบบมัดรวมก้อนเดียวส่งเลย! (ถ้ามีการอนุมัติ) ✨
         if (action === 'Approved' && approvedPayloadData.length > 0) {
@@ -1288,25 +1581,10 @@ async function editMyOTRequest(reqId) {
 }
 
 function searchOTRequests() {
-    const input = document.getElementById("searchInput").value.toLowerCase();
-    const tableBody = document.getElementById("myOTRequestsTableBody");
-    const rows = tableBody.getElementsByTagName("tr");
-
-    let visibleCount = 0;
-
-    for (let i = 0; i < rows.length; i++) {
-        const rowText = rows[i].innerText.toLowerCase();
-        
-        if (rowText.includes(input)) {
-            rows[i].style.display = ""; 
-            visibleCount++;
-        } else {
-            rows[i].style.display = "none"; 
-        }
-    }
-
-    const pageInfo = document.getElementById("paginationInfoText");
-    if (pageInfo) pageInfo.innerText = `ค้นพบ ${visibleCount} รายการ จากการค้นหา`;
+    const searchInput = document.getElementById("searchInput");
+    myOTDashboardSearchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    myOTDashboardCurrentPage = 1;
+    renderMyOTRequestsPage();
 }
 
 // ===================================================
@@ -1315,63 +1593,218 @@ function searchOTRequests() {
 let currentCalDate = new Date(); 
 let calendarOTData = []; 
 let calendarHolidaysData = [];
-let calendarWorkdaysData = []; 
+let calendarWorkdaysData = [];
+let calendarOTByDate = new Map();
+let calendarHolidayByDate = new Map();
+let calendarWorkdayByNumber = new Map();
+let calendarMonthCache = new Map();
+let calendarReferenceDataPromise = null;
+let calendarLoadToken = 0;
+
+const CALENDAR_PAGE_SIZE = 1000;
+
+function formatCalendarISODate(year, monthIndex, day) {
+    return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function normalizeCalendarDateKey(dateValue) {
+    const parsedDate = parseOTRequestDate(dateValue);
+    if (!parsedDate) return '';
+    return formatCalendarISODate(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+}
+
+function formatCalendarDisplayDate(dateValue) {
+    const dateKey = normalizeCalendarDateKey(dateValue);
+    if (!dateKey) return '-';
+    const [year, month, day] = dateKey.split('-');
+    return `${day}-${month}-${year}`;
+}
+
+function getCalendarMonthRange(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    return {
+        key: `${year}-${String(month + 1).padStart(2, '0')}`,
+        startDate: formatCalendarISODate(year, month, 1),
+        endDate: formatCalendarISODate(year, month, lastDay)
+    };
+}
+
+function updateCalendarMonthHeading(date = currentCalDate) {
+    const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const heading = document.getElementById("calendarMonthYear");
+    if (heading) heading.innerText = `${monthNames[date.getMonth()]} ${date.getFullYear() + 543}`;
+}
+
+function setCalendarLoadingState(date = currentCalDate) {
+    updateCalendarMonthHeading(date);
+    const grid = document.getElementById("calendarGrid");
+    if (!grid) return;
+    grid.innerHTML = `
+        <div class="col-span-7 min-h-[280px] flex flex-col items-center justify-center text-slate-400">
+            <i class='bx bx-loader-alt bx-spin text-4xl text-blue-500'></i>
+            <p class="mt-3 text-sm font-medium">กำลังโหลดข้อมูลปฏิทิน...</p>
+        </div>
+    `;
+}
+
+async function fetchCalendarRequestsByMonth(startDate, endDate) {
+    const allRequests = [];
+
+    for (let from = 0; ; from += CALENDAR_PAGE_SIZE) {
+        const to = from + CALENDAR_PAGE_SIZE - 1;
+        const { data, error } = await supabaseClient
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, status')
+            .gte('date_start', startDate)
+            .lte('date_start', endDate)
+            .order('date_start', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to);
+
+        if (error) throw error;
+
+        const page = data || [];
+        allRequests.push(...page);
+        if (page.length < CALENDAR_PAGE_SIZE) break;
+    }
+
+    return allRequests;
+}
+
+async function fetchCalendarReferenceData() {
+    if (!calendarReferenceDataPromise) {
+        calendarReferenceDataPromise = Promise.all([
+            supabaseClient.from('users').select('id, fullname, department, agency, avatar_url'),
+            supabaseClient.from('holidays').select('holiday_date, description'),
+            supabaseClient.from('ot_types').select('id, start_time, end_time'),
+            supabaseClient.from('day_of_week').select('day_number, is_working')
+        ]).then(([userRes, holRes, typeRes, workRes]) => {
+            const firstError = userRes.error || holRes.error || typeRes.error || workRes.error;
+            if (firstError) throw firstError;
+
+            return {
+                users: userRes.data || [],
+                holidays: holRes.data || [],
+                otTypes: typeRes.data || [],
+                workdays: workRes.data || []
+            };
+        }).catch(error => {
+            calendarReferenceDataPromise = null;
+            throw error;
+        });
+    }
+
+    return calendarReferenceDataPromise;
+}
+
+function buildCalendarOTDateIndex(requests) {
+    const dateIndex = new Map();
+
+    requests.forEach(request => {
+        const dateKey = normalizeCalendarDateKey(request.date_start);
+        if (!dateKey) return;
+        if (!dateIndex.has(dateKey)) dateIndex.set(dateKey, []);
+        dateIndex.get(dateKey).push(request);
+    });
+
+    return dateIndex;
+}
 
 async function initCalendar() {
     calendarOTData = [];
     calendarHolidaysData = [];
     calendarWorkdaysData = [];
-    await fetchOTForCalendar();
-    renderCalendar();
+    calendarOTByDate = new Map();
+    calendarHolidayByDate = new Map();
+    calendarWorkdayByNumber = new Map();
+    calendarMonthCache = new Map();
+    calendarReferenceDataPromise = null;
+
+    const loaded = await fetchOTForCalendar(currentCalDate, { forceRefresh: true });
+    if (loaded) renderCalendar();
 }
 
-async function fetchOTForCalendar() {
+async function fetchOTForCalendar(targetDate = currentCalDate, { forceRefresh = false } = {}) {
+    const monthRange = getCalendarMonthRange(targetDate);
+    const cachedMonth = calendarMonthCache.get(monthRange.key);
+    const loadToken = ++calendarLoadToken;
+
+    if (cachedMonth && !forceRefresh) {
+        calendarOTData = cachedMonth.requests;
+        calendarOTByDate = cachedMonth.byDate;
+        return true;
+    }
+
+    setCalendarLoadingState(targetDate);
+
     try {
-        const [reqRes, userRes, holRes, typeRes, workRes] = await Promise.all([
-            supabaseClient.from('ot_requests').select('*'),
-            // ✨ เรียกข้อมูล avatar_url มาด้วย ✨
-            supabaseClient.from('users').select('id, fullname, department, agency, avatar_url'),
-            supabaseClient.from('holidays').select('*'),
-            supabaseClient.from('ot_types').select('*'),
-            supabaseClient.from('day_of_week').select('*') 
+        const [reqs, referenceData] = await Promise.all([
+            fetchCalendarRequestsByMonth(monthRange.startDate, monthRange.endDate),
+            fetchCalendarReferenceData()
         ]);
 
-        const reqs = reqRes.data || [];
-        const users = userRes.data || [];
-        
-        calendarHolidaysData = holRes.data || [];
-        calendarWorkdaysData = workRes.data || []; 
-        const otTypes = typeRes.data || [];
+        if (loadToken !== calendarLoadToken) return false;
 
-        calendarOTData = reqs.map(req => {
-            const user = users.find(u => u.id === req.user_id) || {};
-            const otType = otTypes.find(t => t.id === req.ot_type_id) || {};
-            
+        const userMap = new Map(referenceData.users.map(user => [user.id, user]));
+        const otTypeMap = new Map(referenceData.otTypes.map(otType => [otType.id, otType]));
+        const mappedRequests = reqs.map(req => {
+            const user = userMap.get(req.user_id) || {};
+            const otType = otTypeMap.get(req.ot_type_id) || {};
+
             return {
                 ...req,
                 fullname: user.fullname || req.user_id || 'ไม่ทราบชื่อ',
                 department: user.department || 'ไม่ระบุฝ่าย',
                 agency: user.agency || '-',
-                avatar_url: user.avatar_url || '', // ส่งค่ารูปต่อไปให้ระบบปฏิทิน
+                avatar_url: user.avatar_url || '',
                 time_range: otType.start_time ? `${otType.start_time} - ${otType.end_time}` : '-'
             };
         });
 
+        const byDate = buildCalendarOTDateIndex(mappedRequests);
+        calendarMonthCache.set(monthRange.key, { requests: mappedRequests, byDate });
+
+        calendarOTData = mappedRequests;
+        calendarOTByDate = byDate;
+        calendarHolidaysData = referenceData.holidays;
+        calendarWorkdaysData = referenceData.workdays;
+        calendarHolidayByDate = new Map(
+            calendarHolidaysData
+                .map(holiday => [normalizeCalendarDateKey(holiday.holiday_date), holiday])
+                .filter(([dateKey]) => dateKey)
+        );
+        calendarWorkdayByNumber = new Map(
+            calendarWorkdaysData.map(workday => [Number(workday.day_number), workday])
+        );
+
+        return true;
     } catch (err) {
         console.error("Fetch Calendar Error:", err);
+        if (loadToken === calendarLoadToken) {
+            const grid = document.getElementById("calendarGrid");
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="col-span-7 min-h-[280px] flex flex-col items-center justify-center text-red-500">
+                        <i class='bx bx-error-circle text-4xl'></i>
+                        <p class="mt-3 text-sm font-semibold">โหลดข้อมูลปฏิทินไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ</p>
+                    </div>
+                `;
+            }
+        }
+        return false;
     }
 }
 
 function renderCalendar() {
     const year = currentCalDate.getFullYear();
     const month = currentCalDate.getMonth(); 
-    
-    const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-    document.getElementById("calendarMonthYear").innerText = `${monthNames[month]} ${year + 543}`;
+    updateCalendarMonthHeading(currentCalDate);
 
     const grid = document.getElementById("calendarGrid");
     if (!grid) return; 
-    grid.innerHTML = "";
 
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1380,18 +1813,19 @@ function renderCalendar() {
     const dayAbbr = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
     const deptMap = { 'DPM-001': 'ฝ่ายผลิต MA', 'DPM-002': 'ฝ่ายบุคคล', 'DPM-003': 'ฝ่ายบัญชี', 'DPM-004': 'ฝ่ายวิศวกรรม', 'DPM-005': 'ฝ่ายวางแผน', 'DPM-006': 'ฝ่ายผลิต SM' };
 
+    const calendarCells = [];
+
     // สร้างกล่องล่องหนสำหรับวันว่างก่อนเริ่มเดือน
     for (let i = 0; i < firstDay; i++) {
-        grid.innerHTML += `<div class="bg-slate-50/40 rounded-2xl border-2 border-transparent"></div>`;
+        calendarCells.push(`<div class="bg-slate-50/40 rounded-2xl border-2 border-transparent"></div>`);
     }
 
     const today = new Date();
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateDash = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; 
-        const dateSlash = `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`; 
+        const dateDash = formatCalendarISODate(year, month, day);
 
-        const companyHoliday = calendarHolidaysData.find(h => h.holiday_date === dateSlash || h.holiday_date === dateDash);
+        const companyHoliday = calendarHolidayByDate.get(dateDash);
 
         let currentDateObj = new Date(year, month, day);
         let jsDayIndex = currentDateObj.getDay(); 
@@ -1399,7 +1833,7 @@ function renderCalendar() {
         
         let currentDayName = dayAbbr[jsDayIndex]; // ดึงตัวย่อของวัน
         
-        let dayConfig = calendarWorkdaysData.find(d => d.day_number === dbDayNum);
+        let dayConfig = calendarWorkdayByNumber.get(dbDayNum);
         let isWeeklyHoliday = dayConfig ? (dayConfig.is_working === false) : false;
 
         let isHoliday = companyHoliday || isWeeklyHoliday;
@@ -1411,7 +1845,7 @@ function renderCalendar() {
             holidayDesc = "วันหยุดประจำสัปดาห์"; 
         }
 
-        const otToday = calendarOTData.filter(ot => ot.date_start === dateDash || ot.date_start === dateSlash);
+        const otToday = calendarOTByDate.get(dateDash) || [];
         const groupedByDept = {};
         otToday.forEach(ot => {
             const deptName = deptMap[ot.department] || ot.department || 'ไม่ระบุฝ่าย';
@@ -1423,7 +1857,7 @@ function renderCalendar() {
         for (const [dept, requests] of Object.entries(groupedByDept)) {
             // ✨ ป้ายแผนกแบบใหม่ พื้นเทา ไอคอนตึก แบบมีมิติ ✨
             deptBadgesHTML += `
-                <div onclick="openDeptOTListModal('${dateDash}', '${dateSlash}', '${dept}')" class="text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-semibold flex items-center cursor-pointer hover:bg-slate-200 transition-colors shadow-sm mb-1.5 group border border-slate-200/60">
+                <div onclick="openDeptOTListModal('${dateDash}', '${dept}')" class="calendar-dept-chip text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-semibold flex items-center cursor-pointer hover:bg-slate-200 transition-colors shadow-sm mb-1.5 group border border-slate-200/60">
                     <i class='bx bxs-buildings text-slate-400 mr-2 text-sm group-hover:text-blue-500 transition-colors'></i>
                     <span class="truncate flex-1">${dept} <span class="text-slate-500">(${requests.length})</span></span>
                 </div>
@@ -1447,7 +1881,7 @@ function renderCalendar() {
             cellClasses += " border-slate-100 hover:border-blue-300"; // ขอบปกติ
         }
 
-        grid.innerHTML += `
+        calendarCells.push(`
             <div class="${cellClasses}">
                 ${holidayText}
                 <div class="flex justify-between items-start w-full ${paddingTop} px-1.5 mb-2">
@@ -1458,36 +1892,38 @@ function renderCalendar() {
                     ${deptBadgesHTML}
                 </div>
             </div>
-        `;
+        `);
     }
 
     // สร้างกล่องล่องหนเติมให้เต็มตาราง
     const totalCells = firstDay + daysInMonth;
     const remainingCells = totalCells > 35 ? 42 - totalCells : 35 - totalCells; 
     for (let i = 0; i < remainingCells; i++) {
-        grid.innerHTML += `<div class="bg-slate-50/40 rounded-2xl border-2 border-transparent"></div>`;
+        calendarCells.push(`<div class="bg-slate-50/40 rounded-2xl border-2 border-transparent"></div>`);
     }
+
+    grid.innerHTML = calendarCells.join('');
 }
 
-function changeCalendarMonth(offset) {
-    currentCalDate.setMonth(currentCalDate.getMonth() + offset);
-    renderCalendar();
+async function changeCalendarMonth(offset) {
+    currentCalDate = new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() + offset, 1);
+    const loaded = await fetchOTForCalendar(currentCalDate);
+    if (loaded) renderCalendar();
 }
 
-function openDeptOTListModal(dateDash, dateSlash, deptName) {
+function openDeptOTListModal(dateDash, deptName) {
     const modal = document.getElementById("deptOTListModal");
     const container = document.getElementById("deptOTListContainer");
     
     const deptMapReverse = { 'ฝ่ายผลิต MA': 'DPM-001', 'ฝ่ายบุคคล': 'DPM-002', 'ฝ่ายบัญชี': 'DPM-003', 'ฝ่ายวิศวกรรม': 'DPM-004', 'ฝ่ายวางแผน': 'DPM-005', 'ฝ่ายผลิต SM': 'DPM-006' };
     const deptCode = deptMapReverse[deptName] || deptName;
 
-    const filteredReqs = calendarOTData.filter(ot => 
-        (ot.date_start === dateDash || ot.date_start === dateSlash) && 
+    const filteredReqs = (calendarOTByDate.get(dateDash) || []).filter(ot => 
         (ot.department === deptCode || ot.department === deptName)
     );
 
     document.getElementById("modalDeptTitle").innerText = deptName;
-    document.getElementById("modalDeptCount").innerText = `${filteredReqs.length} คำขอ`;
+    document.getElementById("modalDeptCount").innerText = `วันที่ ${formatCalendarDisplayDate(dateDash)} • ${filteredReqs.length} คำขอ`;
 
     container.innerHTML = "";
 
@@ -1496,24 +1932,24 @@ function openDeptOTListModal(dateDash, dateSlash, deptName) {
     } else {
         filteredReqs.forEach(req => {
             let statusHtml = '';
-            if (req.status === 'Approved') statusHtml = '<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-600 border border-green-200"><i class="bx bx-check-circle mr-0.5"></i>อนุมัติ</span>';
-            else if (req.status === 'Rejected') statusHtml = '<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600 border border-red-200"><i class="bx bx-x-circle mr-0.5"></i>ไม่อนุมัติ</span>';
-            else statusHtml = '<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 border border-amber-200"><i class="bx bx-time-five mr-0.5"></i>รออนุมัติ</span>';
+            if (req.status === 'Approved') statusHtml = '<span class="dashboard-status-approved px-2 md:px-2.5 py-1 md:py-1.5 rounded-full text-[10px] font-bold bg-green-100 text-green-600 border border-green-200"><i class="bx bx-check-circle mr-0.5"></i>อนุมัติ</span>';
+            else if (req.status === 'Rejected') statusHtml = '<span class="dashboard-status-rejected px-2 md:px-2.5 py-1 md:py-1.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 border border-red-200"><i class="bx bx-x-circle mr-0.5"></i>ไม่อนุมัติ</span>';
+            else statusHtml = '<span class="dashboard-status-pending px-2 md:px-2.5 py-1 md:py-1.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 border border-amber-200"><i class="bx bx-time-five mr-0.5"></i>รออนุมัติ</span>';
 
             // ✨ สร้างตัวแปลงชื่อหน่วยงาน เพื่อโชว์ชื่อแทนรหัส ✨
             const agencyMapList = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
             const mappedAgencyName = agencyMapList[req.agency] || req.agency || '-';
 
             const row = document.createElement("div");
-            row.className = "grid grid-cols-12 gap-2 items-center p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 rounded-lg transition-colors";
+            row.className = "calendar-modal-row grid grid-cols-12 gap-2 items-center p-3 md:p-4 hover:bg-slate-50 border-b border-slate-100 last:border-0 rounded-lg transition-colors";
             
             row.innerHTML = `
                 <div class="col-span-5 flex items-center space-x-2 pl-1 overflow-hidden">
-                    <div class="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden border border-slate-300">
+                    <div class="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden border border-slate-300 shadow-sm">
                         <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" class="w-full h-full object-cover">
                     </div>
                     <div class="min-w-0">
-                        <p class="text-xs font-bold text-slate-700 truncate">${req.fullname}</p>
+                        <p class="text-xs md:text-sm font-bold text-slate-700 truncate">${req.fullname}</p>
                         <!-- ✨ แก้ไขที่ 3: โชว์แค่ชื่อหน่วยงาน และไม่แสดงรหัสฝ่ายแล้ว ✨ -->
                         <p class="text-[10px] text-slate-400 truncate">${mappedAgencyName}</p>
                     </div>
@@ -1525,8 +1961,8 @@ function openDeptOTListModal(dateDash, dateSlash, deptName) {
                     ${statusHtml}
                 </div>
                 <div class="col-span-2 text-center flex justify-center">
-                    <button onclick="openOTDetailModal('${req.id}')" class="w-7 h-7 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-110" title="ดูรายละเอียด">
-                        <i class='bx bx-show text-sm'></i>
+                    <button onclick="openOTDetailModal('${req.id}')" class="dashboard-action-btn dashboard-btn-blue w-7 h-7 md:w-9 md:h-9 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-110" title="ดูรายละเอียด">
+                        <i class='bx bx-show text-sm md:text-lg'></i>
                     </button>
                 </div>
             `;
@@ -1557,30 +1993,50 @@ function searchTable(inputId, tbodyId) {
 // ===================================================
 async function loadUsersData() {
     try {
-        const { data: users, error } = await supabaseClient.from('users').select('*').order('id', { ascending: true });
-        if (error) throw error;
+        const [usersRes, agenciesRes, departmentsRes] = await Promise.all([
+            supabaseClient.from('users').select('*').order('id', { ascending: true }),
+            supabaseClient.from('agency').select('*').order('id', { ascending: true }),
+            supabaseClient.from('departments').select('*').order('id', { ascending: true })
+        ]);
+
+        if (usersRes.error) throw usersRes.error;
+        if (agenciesRes.error) console.warn("Load User Agencies Error:", agenciesRes.error);
+        if (departmentsRes.error) console.warn("Load User Departments Error:", departmentsRes.error);
+
+        const users = usersRes.data || [];
+        const agencyNameMap = new Map((agenciesRes.data || []).map(agency => [
+            agency.id,
+            agency.name || agency.agency_name || agency.description || agency.id
+        ]));
+        const departmentNameMap = new Map((departmentsRes.data || []).map(department => [
+            department.id,
+            department.name || department.department_name || department.id
+        ]));
 
         const tbody = document.getElementById("usersTableBody");
         tbody.innerHTML = "";
 
         users.forEach(u => {
             const statusBadge = u.status 
-                ? '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-600 border border-green-200">เปิดใช้งาน</span>'
-                : '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">ปิดใช้งาน</span>';
+                ? '<span class="dashboard-status-approved px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-600 border border-green-200">เปิดใช้งาน</span>'
+                : '<span class="user-status-inactive px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">ปิดใช้งาน</span>';
 
             let roleBadge = '';
-            if(u.role === 'SuperAdmin') roleBadge = '<span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">SuperAdmin</span>';
-            else if(u.role === 'Admin') roleBadge = '<span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">Admin</span>';
-            else if(u.role === 'SuperUser') roleBadge = '<span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">SuperUser</span>';
-            else roleBadge = '<span class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">User</span>';
+            if(u.role === 'SuperAdmin') roleBadge = '<span class="user-role-superadmin text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg border border-transparent">SuperAdmin</span>';
+            else if(u.role === 'Admin') roleBadge = '<span class="user-role-admin text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-transparent">Admin</span>';
+            else if(u.role === 'SuperUser') roleBadge = '<span class="user-role-superuser text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-transparent">SuperUser</span>';
+            else roleBadge = '<span class="user-role-user text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg border border-transparent">User</span>';
+
+            const agencyName = agencyNameMap.get(u.agency) || u.agency || '-';
+            const departmentName = departmentNameMap.get(u.department) || u.department || '-';
 
             tbody.innerHTML += `
-                <tr class="hover:bg-slate-50 transition-colors">
+                <tr class="user-table-row hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center font-bold text-slate-700">${u.id}</td>
                     
                     <td class="p-3">
                         <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
+                            <div class="w-9 h-9 sm:w-14 sm:h-14 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
                                 <img src="${getAvatarUrl(u.fullname, u.avatar_url)}" class="w-full h-full object-cover">
                             </div>
                             <div>
@@ -1589,12 +2045,13 @@ async function loadUsersData() {
                             </div>
                         </div>
                     </td>
+                    <td class="p-3 text-center font-bold text-slate-700 whitespace-nowrap">${u.employee_id ?? '-'}</td>
                     <td class="p-3 text-center">${roleBadge}</td>
-                    <td class="p-3 text-center text-xs text-slate-600">${u.agency || '-'} <br> <span class="text-[10px] text-slate-400">${u.department || '-'}</span></td>
+                    <td class="p-3 text-center text-xs text-slate-600"><span class="font-semibold">${agencyName}</span> <br> <span class="text-[11px] text-slate-400">${departmentName}</span></td>
                     <td class="p-3 text-center">${statusBadge}</td>
                     <td class="p-3 text-center">
-                        <button onclick="openUserModal('${u.id}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openUserModal('${u.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
@@ -1631,7 +2088,9 @@ async function openUserModal(id = null) {
     document.getElementById("formUserId").value = "";
     document.getElementById("formUsername").value = "";
     document.getElementById("formPassword").value = "";
-    document.getElementById("formFullname").value = "";
+    document.getElementById("formEmployeeId").value = "";
+    document.getElementById("formFirstName").value = "";
+    document.getElementById("formLastName").value = "";
     document.getElementById("formAvatarUrl").value = ""; 
     document.getElementById("formRole").value = "User";
     document.getElementById("formStatus").checked = true;
@@ -1678,7 +2137,11 @@ async function openUserModal(id = null) {
                 document.getElementById("formUserId").value = data.id;
                 document.getElementById("formUsername").value = data.username;
                 document.getElementById("formPassword").value = data.password;
-                document.getElementById("formFullname").value = data.fullname;
+                document.getElementById("formEmployeeId").value = data.employee_id ?? "";
+                const normalizedFullname = String(data.fullname || "").trim().replace(/\s+/g, " ");
+                const fullnameParts = normalizedFullname ? normalizedFullname.split(" ") : [];
+                document.getElementById("formFirstName").value = fullnameParts.shift() || "";
+                document.getElementById("formLastName").value = fullnameParts.join(" ");
                 document.getElementById("formAvatarUrl").value = data.avatar_url || ""; 
                 document.getElementById("formAgency").value = data.agency || "";
                 document.getElementById("formDept").value = data.department || "";
@@ -1707,7 +2170,10 @@ async function saveUserData() {
 
     const username = document.getElementById("formUsername").value.trim();
     const password = document.getElementById("formPassword").value.trim();
-    const fullname = document.getElementById("formFullname").value.trim();
+    const employeeId = document.getElementById("formEmployeeId").value.trim();
+    const firstName = document.getElementById("formFirstName").value.trim().replace(/\s+/g, " ");
+    const lastName = document.getElementById("formLastName").value.trim().replace(/\s+/g, " ");
+    const fullname = `${firstName} ${lastName}`;
     const agency = document.getElementById("formAgency").value;
     const department = document.getElementById("formDept").value;
     const role = document.getElementById("formRole").value;
@@ -1715,8 +2181,8 @@ async function saveUserData() {
     
     let finalAvatarUrl = document.getElementById("formAvatarUrl").value;
 
-    if (!username || !password || !fullname) {
-        Swal.fire('ข้อมูลไม่ครบ', 'อย่าลืมกรอก Username, Password และชื่อ-นามสกุลให้ครบถ้วนนะคะ 🥺', 'warning'); 
+    if (!username || !password || !firstName || !lastName) {
+        Swal.fire('ข้อมูลไม่ครบ', 'อย่าลืมกรอก Username, Password, ชื่อ และนามสกุลให้ครบถ้วนนะคะ 🥺', 'warning'); 
         return;
     }
 
@@ -1752,6 +2218,7 @@ async function saveUserData() {
         const payload = {
             username: username,
             password: password,
+            employee_id: employeeId || null,
             fullname: fullname,
             avatar_url: finalAvatarUrl, 
             agency: agency,
@@ -1762,7 +2229,8 @@ async function saveUserData() {
 
         // ✨ ขั้นตอนที่ 3: ตรวจสอบว่าเป็นการแก้ไขหรือเพิ่มใหม่
         if (id) {
-            await supabaseClient.from('users').update(payload).eq('id', id);
+            const { error: updateError } = await supabaseClient.from('users').update(payload).eq('id', id);
+            if (updateError) throw updateError;
         } else {
             // ถ้ารหัสพนักงานใหม่ ให้ไปหารหัสล่าสุดมาก่อน
             const { data: lastUser, error: lastUserErr } = await supabaseClient
@@ -1770,6 +2238,8 @@ async function saveUserData() {
                 .select('id')
                 .order('id', { ascending: false })
                 .limit(1);
+
+            if (lastUserErr) throw lastUserErr;
 
             let newId = "USER-001"; // ค่าเริ่มต้น
 
@@ -1782,7 +2252,8 @@ async function saveUserData() {
 
             payload.id = newId; // ใส่รหัสใหม่เข้าไปใน payload
             
-            await supabaseClient.from('users').insert([payload]);
+            const { error: insertError } = await supabaseClient.from('users').insert([payload]);
+            if (insertError) throw insertError;
         }
         
         closeUserModal();
@@ -1844,8 +2315,8 @@ async function loadAgenciesData() {
                     <td class="p-4 text-center font-bold text-slate-700">${a.id}</td>
                     <td class="p-4 text-slate-600 font-medium">${agencyName}</td>
                     <td class="p-4 text-center">
-                        <button onclick="openAgencyModal('${a.id}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteAgencyData('${a.id}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openAgencyModal('${a.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteAgencyData('${a.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
@@ -2044,11 +2515,11 @@ async function loadHolidaysData() {
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="p-4 text-center font-bold text-slate-700">${h.id}</td>
-                    <td class="p-4 text-center text-rose-600 font-semibold">${h.holiday_date}</td>
+                    <td class="holiday-date p-4 text-center text-rose-600 font-semibold">${h.holiday_date}</td>
                     <td class="p-4 text-slate-600 font-medium">${h.description || '-'}</td>
                     <td class="p-4 text-center">
-                        <button onclick="openHolidayModal('${h.id}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteHolidayData('${h.id}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openHolidayModal('${h.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteHolidayData('${h.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
@@ -2170,11 +2641,11 @@ async function loadOTTypesData() {
                     <td class="p-4 text-center text-slate-600 font-medium">${ot.start_time}</td>
                     <td class="p-4 text-center text-slate-600 font-medium">${ot.end_time}</td>
                     <td class="p-4 text-center">
-                        <span class="bg-orange-100 text-orange-600 font-bold px-3 py-1 rounded-full text-xs">${ot.rate} เท่า</span>
+                        <span class="report-rate-badge bg-orange-100 text-orange-600 font-bold px-3 py-1 rounded-full text-xs border border-transparent">${ot.rate} เท่า</span>
                     </td>
                     <td class="p-4 text-center">
-                        <button onclick="openOTTypeModal('${ot.id}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteOTTypeData('${ot.id}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openOTTypeModal('${ot.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteOTTypeData('${ot.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
@@ -2279,8 +2750,8 @@ async function loadWorkdaysData() {
 
         workdays.forEach(wd => {
             const workingBadge = wd.is_working 
-                ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-600"><i class="bx bx-check-circle mr-1"></i>วันทำงาน</span>'
-                : '<span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600"><i class="bx bx-x-circle mr-1"></i>วันหยุด</span>';
+                ? '<span class="dashboard-status-approved px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-600 border border-transparent"><i class="bx bx-check-circle mr-1"></i>วันทำงาน</span>'
+                : '<span class="dashboard-status-rejected px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-transparent"><i class="bx bx-x-circle mr-1"></i>วันหยุด</span>';
 
             tbody.innerHTML += `
                 <tr class="hover:bg-slate-50 transition-colors">
@@ -2288,8 +2759,8 @@ async function loadWorkdaysData() {
                     <td class="p-4 text-slate-700 font-bold">${wd.day_name}</td>
                     <td class="p-4 text-center">${workingBadge}</td>
                     <td class="p-4 text-center">
-                        <button onclick="openWorkdayModal('${wd.day_name}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteWorkdayData('${wd.day_name}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openWorkdayModal('${wd.day_name}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteWorkdayData('${wd.day_name}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
@@ -2458,7 +2929,7 @@ function setReportSummary(total = 0, approved = 0, hours = 0) {
 function setReportTableMessage(message, colorClass = "text-slate-400") {
     const tbody = document.getElementById("reportsTableBody");
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="11" class="p-10 text-center ${colorClass}">${message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="p-10 text-center ${colorClass}">${message}</td></tr>`;
 }
 
 function setReportLoading(isLoading) {
@@ -2619,10 +3090,9 @@ async function loadReportsData() {
 
         let userQuery = supabaseClient
             .from('users')
-            .select('id, fullname, department, agency, avatar_url');
+            .select('id, fullname, employee_id, department, agency, avatar_url');
 
         if (filterDept) userQuery = userQuery.eq('department', filterDept);
-        if (filterSearch) userQuery = userQuery.ilike('fullname', `%${filterSearch}%`);
 
         const departmentPromise = reportDepartments.length > 0
             ? Promise.resolve({ data: reportDepartments, error: null })
@@ -2648,11 +3118,11 @@ async function loadReportsData() {
         const userMap = new Map(users.map(user => [user.id, user]));
         const typeMap = new Map(otTypes.map(type => [type.id, type]));
         const deptMap = new Map(depts.map(dept => [dept.id, dept]));
-        const restrictByUser = Boolean(filterDept || filterSearch);
-        const agencyMapList = { 'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending', 'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding', 'AGC-011': 'QC/Delivery', 'AGC-013': 'Engineering', 'AGC-014': 'HR', 'AGC-015': 'Planning', 'AGC-016': 'Accounting' };
+        const restrictByDepartment = Boolean(filterDept);
+        const normalizedSearch = filterSearch.toLocaleLowerCase('th-TH');
 
         allReportData = reqs
-            .filter(req => !restrictByUser || userMap.has(req.user_id))
+            .filter(req => !restrictByDepartment || userMap.has(req.user_id))
             .map(req => {
                 const user = userMap.get(req.user_id) || {};
                 const otType = typeMap.get(req.ot_type_id) || {};
@@ -2664,8 +3134,9 @@ async function loadReportsData() {
                 return {
                     ...req,
                     fullname: user.fullname || req.user_id || '-',
+                    employee_id: user.employee_id ?? '-',
                     avatar_url: user.avatar_url || '',
-                    agency_name: agencyMapList[user.agency] || user.agency || '-',
+                    agency_name: AGENCY_NAME_MAP[user.agency] || user.agency || '-',
                     department_id: user.department || '-',
                     department_name: department.name || user.department || '-',
                     time_range: otType.start_time ? `${otType.start_time} - ${otType.end_time}` : '-',
@@ -2673,6 +3144,19 @@ async function loadReportsData() {
                     hours,
                     description: req.description || '-'
                 };
+            })
+            .filter(reportRow => {
+                if (!normalizedSearch) return true;
+
+                const searchableFields = [
+                    reportRow.fullname,
+                    reportRow.employee_id,
+                    reportRow.agency_name,
+                    reportRow.department_name
+                ];
+                return searchableFields.some(value =>
+                    String(value || '').toLocaleLowerCase('th-TH').includes(normalizedSearch)
+                );
             });
 
         currentFilteredReportData = [...allReportData];
@@ -2704,9 +3188,9 @@ function renderReportsTable(data) {
             }
 
             let badgeHTML = '';
-            if (req.status === 'Approved') badgeHTML = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-600">อนุมัติแล้ว</span>';
-            else if (req.status === 'Rejected') badgeHTML = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600">ไม่อนุมัติ</span>';
-            else badgeHTML = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600">รอพิจารณา</span>';
+            if (req.status === 'Approved') badgeHTML = '<span class="dashboard-status-approved px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-600">อนุมัติแล้ว</span>';
+            else if (req.status === 'Rejected') badgeHTML = '<span class="dashboard-status-rejected px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600">ไม่อนุมัติ</span>';
+            else badgeHTML = '<span class="dashboard-status-pending px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600">รอพิจารณา</span>';
 
             let showDate = req.date_start;
             if(showDate && showDate.includes('-')) {
@@ -2715,28 +3199,29 @@ function renderReportsTable(data) {
             }
             
             return `
-                <tr class="hover:bg-slate-50 transition-colors">
+                <tr class="report-table-row hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center text-slate-600">${showDate}</td>
                     <td class="p-3 text-center font-bold text-slate-700">${req.id}</td>
                     <td class="p-3">
                         <div class="flex items-center space-x-2">
-                            <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300 shadow-sm">
-                                <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" class="w-full h-full object-cover">
+                            <div class="w-10 h-10 lg:w-14 lg:h-14 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300 shadow-sm">
+                                <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" loading="lazy" decoding="async" class="w-full h-full object-cover object-top">
                             </div>
                             <span class="font-semibold text-slate-800 whitespace-nowrap">${req.fullname}</span>
                         </div>
                     </td>
+                    <td class="p-3 text-center font-bold text-slate-700 whitespace-nowrap">${req.employee_id}</td>
                     <td class="p-3 text-center text-slate-600 text-[11px] whitespace-nowrap">${req.agency_name}</td>
                     <td class="p-3 text-center text-slate-500 text-[11px] whitespace-nowrap">${req.department_name}</td>
                     <td class="p-3 text-center text-slate-600 text-xs truncate max-w-[120px]" title="${req.description}">${req.description}</td>
                     <td class="p-3 text-center text-slate-600 text-xs font-medium whitespace-nowrap">${req.time_range}</td>
                     <td class="p-3 text-center whitespace-nowrap">
-                        <span class="bg-orange-100 text-orange-600 font-bold px-2.5 py-1 rounded-full text-[10px] border border-orange-200">${req.rate}</span>
+                        <span class="report-rate-badge bg-orange-100 text-orange-600 font-bold px-2.5 py-1 rounded-full text-[10px] border border-orange-200">${req.rate}</span>
                     </td>
                     <td class="p-3 text-center font-bold text-blue-600">${req.hours.toFixed(2)}</td>
                     <td class="p-3 text-center">${badgeHTML}</td>
                     <td class="p-3 text-center">
-                        <button onclick="openOTDetailModal('${req.id}')" class="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm mx-auto" title="ดูรายละเอียด">
+                        <button onclick="openOTDetailModal('${req.id}')" class="dashboard-action-btn dashboard-btn-blue w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm mx-auto" title="ดูรายละเอียด">
                             <i class='bx bx-show text-lg'></i>
                         </button>
                     </td>
@@ -2773,6 +3258,7 @@ function exportToExcel() {
             "วันที่ทำ OT": showDate,
             "รหัสคำขอ": req.id,
             "ชื่อพนักงาน": req.fullname,
+            "รหัสพนักงาน": req.employee_id,
             "หน่วยงาน": req.agency_name, // ✨ เพิ่มคอลัมน์หน่วยงาน
             "ฝ่าย": req.department_name,
             "เหตุผล": req.description, 
@@ -2839,7 +3325,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // จัดการแสดงผลข้อมูล User บน Header
         document.getElementById("headerFullname").innerText = data.fullname;
-        document.getElementById("headerRole").innerText = data.role;
+        document.getElementById("headerRole").innerText = getUserOrganizationLabel(data);
         
         // อัปเดตรูปโปรไฟล์มุมขวา
         const avatarCircle = document.getElementById("userAvatarCircle");
