@@ -698,7 +698,7 @@ async function loadApprovalQueueData() {
 
                 <td class="p-3">
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 lg:w-14 lg:h-14 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
+                        <div class="w-14 h-14 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 shadow-sm">
                             <img src="${empAvatar}" loading="lazy" decoding="async" class="w-full h-full object-cover object-top">
                         </div>
                         <div>
@@ -1945,7 +1945,7 @@ function openDeptOTListModal(dateDash, deptName) {
             
             row.innerHTML = `
                 <div class="col-span-5 flex items-center space-x-2 pl-1 overflow-hidden">
-                    <div class="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden border border-slate-300 shadow-sm">
+                    <div class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden border border-slate-300 shadow-sm">
                         <img src="${getAvatarUrl(req.fullname, req.avatar_url)}" class="w-full h-full object-cover">
                     </div>
                     <div class="min-w-0">
