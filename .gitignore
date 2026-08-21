@@ -1,0 +1,17 @@
+# Node / NPM
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temp / Logs
+*.log
+*.xlsx
+scratch/
+outputs/

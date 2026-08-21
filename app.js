@@ -1,11 +1,29 @@
+
+function updateRoleSpecificUI(role) {
+    const adminMenu = document.getElementById("adminMenuSection");
+    const menuTab2 = document.getElementById("menuTab2"); 
+    const menuTab5 = document.getElementById("menuTab5"); 
+    const approvalTabContainer = document.getElementById("approvalTabContainer");
+
+    const isSuperAdmin = (role === 'SuperAdmin');
+    if (adminMenu) adminMenu.style.display = isSuperAdmin ? "block" : "none";
+    if (approvalTabContainer) approvalTabContainer.style.display = isSuperAdmin ? "flex" : "none";
+
+    if (role === 'User') {
+        if (menuTab2) menuTab2.style.display = "none";
+        if (menuTab5) menuTab5.style.display = "none";
+    } else {
+        if (menuTab2) menuTab2.style.display = "flex";
+        if (menuTab5) menuTab5.style.display = "flex";
+    }
+}
+
 // ===================================================
 // app.js - ไฟล์ควบคุมระบบ OverTime Management System (Supabase)
 // ฉบับเต็มเวอร์ชันสมบูรณ์ (อัปเดตล่าสุด) จัดทำโดย ไนท์ เพื่อพี่ต้นค่ะ 💖
 // ===================================================
 const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw/exec"; // ✨ เอา URL จากสเต็ป 2 มาวางตรงนี้นะคะ
 let currentUser = null;
-let myOtBarChartInstance = null;
-let myOtDoughnutChartInstance = null;
 let finalSelectedApprovers = []; 
 let tempSelectedApprovers = [];  
 
@@ -172,22 +190,7 @@ async function loginUsersSupabase() {
             avatarCircle.innerHTML = data.fullname.charAt(0);
         }
 
-        const adminMenu = document.getElementById("adminMenuSection");
-        const menuTab2 = document.getElementById("menuTab2"); 
-        const menuTab5 = document.getElementById("menuTab5"); 
-
-        if (adminMenu) {
-            if (data.role === 'SuperAdmin') adminMenu.style.display = "block";
-            else adminMenu.style.display = "none";
-        }
-
-        if (data.role === 'User') {
-            if (menuTab2) menuTab2.style.display = "none";
-            if (menuTab5) menuTab5.style.display = "none";
-        } else {
-            if (menuTab2) menuTab2.style.display = "flex";
-            if (menuTab5) menuTab5.style.display = "flex";
-        }
+        updateRoleSpecificUI(data.role);
 
         document.getElementById("pageformLogin").style.display = "none";
         document.getElementById("dashboardPage").style.display = "block";
@@ -238,7 +241,7 @@ function changePage(pageNumber) {
     }
 
     if (pageNumber === 1) loadMyOTDashboardData();
-    if (pageNumber === 2) loadApprovalQueueData();
+    if (pageNumber === 2) { if (currentUser) updateRoleSpecificUI(currentUser.role); if (typeof loadCurrentApprovalTab === 'function') loadCurrentApprovalTab(); else loadApprovalQueueData(); }
     if (pageNumber === 3) initCalendar(); 
     if (pageNumber === 5) initializeReportsPage();
     if (pageNumber === 6) loadUsersData(); 
@@ -502,62 +505,6 @@ function changeMyOTDashboardPage(action) {
     renderMyOTRequestsPage();
 }
 
-function drawMyOTCharts(labels, counts) {
-    const barCtx = document.getElementById('otBarChart').getContext('2d');
-    const doughCtx = document.getElementById('otDoughnutChart').getContext('2d');
-
-    if (myOtBarChartInstance) myOtBarChartInstance.destroy();
-    if (myOtDoughnutChartInstance) myOtDoughnutChartInstance.destroy();
-
-    const bgColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
-
-    myOtBarChartInstance = new Chart(barCtx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'จำนวนชั่วโมงที่ขอ OT (ชม.)', // ✨ ไนท์เปลี่ยนข้อความตรงนี้ให้ค่ะ ✨
-                data: counts,
-                backgroundColor: '#10b981', 
-                borderRadius: 4,
-                maxBarThickness: 50
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                x: { ticks: { font: { family: 'Prompt' } } }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: { titleFont: { family: 'Prompt' }, bodyFont: { family: 'Prompt' } }
-            }
-        }
-    });
-
-    myOtDoughnutChartInstance = new Chart(doughCtx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: counts,
-                backgroundColor: bgColors,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: { position: 'top', labels: { font: { family: 'Prompt' } } },
-                tooltip: { titleFont: { family: 'Prompt' }, bodyFont: { family: 'Prompt' } }
-            }
-        }
-    });
-}
 
 // ----------------===================================
 // 4. ระบบคิวงานพิจารณาอนุมัติแบบขั้นบันไดลำดับ 1->2->3 (Page 2)
@@ -1279,6 +1226,8 @@ async function openOTDetailModal(reqId) {
         timelineContainer.innerHTML = '';
 
         if (stepsData.length > 0) {
+            let previousRejectedStepOrder = null;
+
             timelineContainer.innerHTML = stepsData.map(step => {
                 const approverName = approverMap.get(step.approver_id) || step.approver_id;
                 let displayDate = step.approved_at || '-';
@@ -1297,15 +1246,21 @@ async function openOTDetailModal(reqId) {
                 let iconColor = 'bg-slate-200 text-slate-400';
                 let statusText = '<span class="text-slate-500 text-xs">รอคิวพิจารณา</span>';
 
-                if (step.status === 'Approved') {
-                    iconColor = 'bg-green-500 text-white';
-                    statusText = `<span class="text-green-600 text-xs font-bold">อนุมัติแล้ว (${displayDate})</span>`;
-                } else if (step.status === 'Rejected') {
-                    iconColor = 'bg-red-500 text-white';
-                    statusText = `<span class="text-red-600 text-xs font-bold">ไม่อนุมัติ (${displayDate})</span>`;
-                } else if (step.status === 'Pending') {
-                    iconColor = 'bg-amber-400 text-white border-2 border-amber-200';
-                    statusText = '<span class="text-amber-500 text-xs font-bold">กำลังรอพิจารณา</span>';
+                if (previousRejectedStepOrder !== null) {
+                    iconColor = 'bg-red-100 text-red-400';
+                    statusText = `<span class="text-red-500 text-xs">ไม่อนุมัติตาม Step ${previousRejectedStepOrder}</span>`;
+                } else {
+                    if (step.status === 'Approved') {
+                        iconColor = 'bg-green-500 text-white';
+                        statusText = `<span class="text-green-600 text-xs font-bold">อนุมัติแล้ว (${displayDate})</span>`;
+                    } else if (step.status === 'Rejected') {
+                        iconColor = 'bg-red-500 text-white';
+                        statusText = `<span class="text-red-600 text-xs font-bold">ไม่อนุมัติ (${displayDate})</span>`;
+                        previousRejectedStepOrder = step.step_order;
+                    } else if (step.status === 'Pending') {
+                        iconColor = 'bg-amber-400 text-white border-2 border-amber-200';
+                        statusText = '<span class="text-amber-500 text-xs font-bold">กำลังรอพิจารณา</span>';
+                    }
                 }
 
                 const commentHtml = step.comment && step.comment !== '-'
@@ -1423,6 +1378,12 @@ async function bulkApproveSteps(action) {
             if (rejectedRequestIds.length > 0) {
                 requestUpdatePromises.push(
                     supabaseClient.from('ot_requests').update({ status: 'Rejected' }).in('id', rejectedRequestIds)
+                );
+                requestUpdatePromises.push(
+                    supabaseClient.from('approval_steps')
+                        .update({ status: 'Rejected' })
+                        .in('request_id', rejectedRequestIds)
+                        .eq('status', 'Pending')
                 );
             }
         } else if (action === 'Approved') {
@@ -3337,18 +3298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // จัดการเมนูต่างๆ ตามสิทธิ์
-        const adminMenu = document.getElementById("adminMenuSection");
-        const menuTab2 = document.getElementById("menuTab2"); 
-        const menuTab5 = document.getElementById("menuTab5"); 
-
-        if (adminMenu) adminMenu.style.display = (data.role === 'SuperAdmin') ? "block" : "none";
-        if (data.role === 'User') {
-            if (menuTab2) menuTab2.style.display = "none";
-            if (menuTab5) menuTab5.style.display = "none";
-        } else {
-            if (menuTab2) menuTab2.style.display = "flex";
-            if (menuTab5) menuTab5.style.display = "flex";
-        }
+        updateRoleSpecificUI(data.role);
 
         // ปิดหน้าล็อกอิน เปิดหน้า Dashboard
         document.getElementById("pageformLogin").style.display = "none";
@@ -3369,5 +3319,382 @@ function togglePasswordVisibility() {
         pwdInput.type = 'password';
         eyeIcon.classList.remove('bx-hide');
         eyeIcon.classList.add('bx-show');
+    }
+}
+
+
+// ===================================================
+// ✨ ฟังก์ชันจัดการรายการที่ดำเนินการแล้วสำหรับ SuperAdmin ✨
+// ===================================================
+let currentApprovalTab = 'pending';
+let superAdminOTTypesCache = [];
+
+function switchApprovalTab(tab) {
+    currentApprovalTab = tab;
+    const btnPending = document.getElementById('tabPending');
+    const btnProcessed = document.getElementById('tabProcessed');
+    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+    const bulkRejectBtn = document.getElementById('bulkRejectBtn');
+    const pageTitle = document.getElementById('page2Title');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    if (!btnPending || !btnProcessed) return;
+
+    if (tab === 'pending') {
+        btnPending.className = "px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
+        btnProcessed.className = "px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
+        
+        if (pageTitle) pageTitle.innerText = "รายการรออนุมัติ OT";
+        if (bulkApproveBtn) bulkApproveBtn.style.display = "";
+        if (bulkRejectBtn) bulkRejectBtn.style.display = "";
+        if (selectAllCheckbox) selectAllCheckbox.disabled = false;
+    } else {
+        btnProcessed.className = "px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
+        btnPending.className = "px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
+        
+        if (pageTitle) pageTitle.innerText = "รายการดำเนินการแล้ว (SuperAdmin)";
+        if (bulkApproveBtn) bulkApproveBtn.style.display = "none";
+        if (bulkRejectBtn) bulkRejectBtn.style.display = "none";
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.disabled = true;
+        }
+    }
+    loadCurrentApprovalTab();
+}
+
+function loadCurrentApprovalTab() {
+    if (currentApprovalTab === 'pending') {
+        loadApprovalQueueData();
+    } else {
+        loadProcessedApprovalData();
+    }
+}
+
+async function loadProcessedApprovalData() {
+    if (!currentUser || currentUser.role !== 'SuperAdmin') return;
+
+    const tbody = document.getElementById("approvalQueueTableBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการที่ดำเนินการแล้ว...</td></tr>';
+
+    try {
+        const { data: processedRequests, error: reqErr } = await supabaseClient
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, description, status, submit_date')
+            .in('status', ['Approved', 'Rejected'])
+            .order('submit_date', { ascending: false })
+            .limit(100);
+
+        if (reqErr) throw reqErr;
+
+        if (!processedRequests || processedRequests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400">ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨</td></tr>';
+            return;
+        }
+
+        const userIds = [...new Set(processedRequests.map(r => r.user_id).filter(Boolean))];
+        const otTypeIds = [...new Set(processedRequests.map(r => r.ot_type_id).filter(Boolean))];
+
+        const [usersRes, otTypesRes] = await Promise.all([
+            userIds.length > 0 ? supabaseClient.from('users').select('id, fullname, avatar_url, role, department, agency').in('id', userIds) : Promise.resolve({ data: [] }),
+            supabaseClient.from('ot_types').select('id, rate, start_time, end_time')
+        ]);
+
+        superAdminOTTypesCache = otTypesRes.data || [];
+        const userMap = new Map((usersRes.data || []).map(u => [u.id, u]));
+        const otTypeMap = new Map((superAdminOTTypesCache).map(ot => [ot.id, ot]));
+
+        const fragment = document.createDocumentFragment();
+
+        processedRequests.forEach(request => {
+            const userData = userMap.get(request.user_id) || {};
+            const otTypeData = otTypeMap.get(request.ot_type_id) || {};
+
+            const empName = userData.fullname || request.user_id;
+            const empAvatar = getAvatarUrl(empName, userData.avatar_url);
+            const empRole = userData.role || '-';
+            const empDept = getUserOrganizationLabel(userData);
+
+            const otRate = otTypeData.rate ? `โอที (${otTypeData.rate}) เท่า` : '-';
+            const otTime = otTypeData.start_time ? `${otTypeData.start_time} - ${otTypeData.end_time}` : '-';
+
+            let showDate = request.date_start || '-';
+            if (showDate && showDate.includes('-')) {
+                const parts = showDate.split('-');
+                if (parts.length === 3) {
+                    showDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+            }
+
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors";
+
+            let statusBadge = '';
+            if (request.status === 'Approved') {
+                statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"><i class="bx bx-check-circle mr-1"></i> อนุมัติแล้ว</span>';
+            } else {
+                statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50"><i class="bx bx-x-circle mr-1"></i> ไม่อนุมัติ</span>';
+            }
+
+            tr.innerHTML = `
+                <td class="p-4 text-center">
+                    <span class="text-xs text-slate-300 dark:text-slate-600">-</span>
+                </td>
+                <td class="p-4 text-center">
+                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg">${request.id}</span>
+                </td>
+                <td class="p-4">
+                    <div class="flex items-center space-x-3.5">
+                        <img src="${empAvatar}" alt="Avatar" class="w-12 h-12 rounded-2xl object-cover shrink-0 border-2 border-white dark:border-slate-700 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600">
+                        <div class="min-w-0">
+                            <p class="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">${empName}</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5 truncate">${empDept}</p>
+                        </div>
+                    </div>
+                </td>
+                <td class="p-4 text-center">
+                    <span class="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-600">${otRate}</span>
+                </td>
+                <td class="p-4 text-center font-medium text-sm text-slate-700 dark:text-slate-300">${showDate}</td>
+                <td class="p-4 text-center text-sm font-semibold text-slate-800 dark:text-slate-200">${otTime}</td>
+                <td class="p-4 text-center">
+                    <span class="text-xs text-slate-600 dark:text-slate-400 max-w-[160px] inline-block truncate" title="${request.description || '-'}">${request.description || '-'}</span>
+                </td>
+                <td class="p-4 text-center">${statusBadge}</td>
+                <td class="p-4 text-center">
+                    <button onclick="openSuperAdminEditModal('${request.id}')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/60 rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1">
+                        <i class="bx bx-edit-alt text-sm"></i>
+                        <span>แก้ไข</span>
+                    </button>
+                </td>
+            `;
+
+            fragment.appendChild(tr);
+        });
+
+        tbody.replaceChildren(fragment);
+
+    } catch (err) {
+        console.error("Load Processed Approvals Error:", err);
+        tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-rose-500">เกิดข้อผิดพลาดในการโหลดข้อมูลค่ะ</td></tr>';
+    }
+}
+
+// ---------------------------------------------------
+// Modal Logic: แก้ไขคำขอพิเศษ (SuperAdmin)
+// ---------------------------------------------------
+async function openSuperAdminEditModal(reqId) {
+    if (currentUser?.role !== 'SuperAdmin') return;
+
+    Swal.fire({
+        title: 'กำลังโหลดข้อมูล...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        // 1. Fetch OT Request
+        const { data: request, error: reqErr } = await supabaseClient
+            .from('ot_requests')
+            .select('*')
+            .eq('id', reqId)
+            .single();
+
+        if (reqErr || !request) throw reqErr || new Error('ไม่พบข้อมูลคำขอ');
+
+        // 2. Fetch User
+        const { data: user, error: userErr } = await supabaseClient
+            .from('users')
+            .select('id, fullname, avatar_url, role, department, agency')
+            .eq('id', request.user_id)
+            .single();
+
+        // 3. Fetch OT Types (if not cached)
+        if (!superAdminOTTypesCache || superAdminOTTypesCache.length === 0) {
+            const { data: otTypes } = await supabaseClient.from('ot_types').select('*');
+            superAdminOTTypesCache = otTypes || [];
+        }
+
+        Swal.close();
+
+        // Populate Modal Fields
+        document.getElementById('superAdminEditReqId').value = request.id;
+        document.getElementById('superAdminEditUserId').value = request.user_id;
+        document.getElementById('superAdminModalReqIdDisplay').value = request.id;
+
+        // User Profile Card
+        const empName = user?.fullname || request.user_id;
+        document.getElementById('superAdminModalEmpName').innerText = empName;
+        document.getElementById('superAdminModalEmpDept').innerText = user ? getUserOrganizationLabel(user) : '-';
+        document.getElementById('superAdminModalAvatar').src = getAvatarUrl(empName, user?.avatar_url);
+
+        // Date
+        document.getElementById('superAdminModalDate').value = request.date_start || '';
+
+        // Description
+        document.getElementById('superAdminModalDesc').value = request.description || '';
+
+        // OT Type Select
+        const otTypeSelect = document.getElementById('superAdminModalOtType');
+        otTypeSelect.innerHTML = '';
+        superAdminOTTypesCache.forEach(ot => {
+            const opt = document.createElement('option');
+            opt.value = ot.id;
+            opt.textContent = `${ot.start_time} - ${ot.end_time} (${ot.rate} เท่า)`;
+            if (ot.id === request.ot_type_id) opt.selected = true;
+            otTypeSelect.appendChild(opt);
+        });
+
+        // Trigger change to update time & hours display
+        onSuperAdminOtTypeChange();
+
+        // Show Modal
+        const modal = document.getElementById('superAdminEditModal');
+        modal.classList.remove('hidden');
+
+    } catch (err) {
+        console.error("Open SuperAdmin Edit Modal Error:", err);
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเปิดหน้าแก้ไขคำขอได้ค่ะ', 'error');
+    }
+}
+
+function closeSuperAdminEditModal() {
+    const modal = document.getElementById('superAdminEditModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function onSuperAdminOtTypeChange() {
+    const select = document.getElementById('superAdminModalOtType');
+    const selectedId = select?.value;
+    const otType = (superAdminOTTypesCache || []).find(o => o.id === selectedId);
+
+    const timeDisplay = document.getElementById('superAdminModalTimeDisplay');
+    const hoursDisplay = document.getElementById('superAdminModalHoursDisplay');
+
+    if (otType && otType.start_time && otType.end_time) {
+        timeDisplay.value = `${otType.start_time} - ${otType.end_time} (${otType.rate}x)`;
+        const hrs = calculateOTHours(otType.start_time, otType.end_time);
+        hoursDisplay.value = `${hrs} ชม.`;
+    } else {
+        timeDisplay.value = '-';
+        hoursDisplay.value = '-';
+    }
+}
+
+// 1. บันทึกข้อมูลที่แก้ไข
+async function superAdminSaveEditedOT() {
+    const reqId = document.getElementById('superAdminEditReqId').value;
+    const newOtTypeId = document.getElementById('superAdminModalOtType').value;
+    const newDate = document.getElementById('superAdminModalDate').value;
+    const newDesc = document.getElementById('superAdminModalDesc').value.trim();
+
+    if (!reqId || !newOtTypeId || !newDate) {
+        Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุประเภทโอทีและวันที่ให้ครบถ้วนค่ะ', 'warning');
+        return;
+    }
+
+    const confirm = await Swal.fire({
+        title: 'ยืนยันการบันทึกการแก้ไข?',
+        text: 'ระบบจะอัปเดตข้อมูลคำขอและคำนวณชั่วโมงโอทีของพนักงานใหม่โดยอัตโนมัติค่ะ',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ใช่, บันทึกเลย',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (confirm.isConfirmed) {
+        Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        try {
+            const { error } = await supabaseClient
+                .from('ot_requests')
+                .update({
+                    ot_type_id: newOtTypeId,
+                    date_start: newDate,
+                    description: newDesc
+                })
+                .eq('id', reqId);
+
+            if (error) throw error;
+
+            Swal.fire('สำเร็จ', 'แก้ไขข้อมูลคำขอโอทีเรียบร้อยแล้วค่ะ ✨', 'success');
+            closeSuperAdminEditModal();
+            loadProcessedApprovalData();
+        } catch (err) {
+            console.error("Save Edited OT Error:", err);
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้ค่ะ', 'error');
+        }
+    }
+}
+
+// 2. ดึงกลับเป็น Pending
+async function superAdminConfirmResetStatus() {
+    const reqId = document.getElementById('superAdminEditReqId').value;
+    if (!reqId) return;
+
+    const result = await Swal.fire({
+        title: 'ยืนยันการดึงกลับ (Pending)?',
+        text: 'รายการนี้จะถูกเปลี่ยนสถานะกลับเป็น "รออนุมัติ" เพื่อให้สามารถพิจารณาอนุมัติใหม่ได้ และยอดชั่วโมงจะถูกตัดออกจากรายงานจนกว่าจะได้รับอนุมัติใหม่ค่ะ',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ใช่, ดึงกลับ',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+        Swal.fire({ title: 'กำลังดำเนินการ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        try {
+            const { error: updateReqErr } = await supabaseClient.from('ot_requests').update({ status: 'Pending' }).eq('id', reqId);
+            if (updateReqErr) throw updateReqErr;
+            
+            const { error: updateStepsErr } = await supabaseClient.from('approval_steps').update({ status: 'Pending' }).eq('request_id', reqId);
+            if (updateStepsErr) throw updateStepsErr;
+            
+            Swal.fire('สำเร็จ', 'ดึงกลับสถานะเป็นรออนุมัติเรียบร้อยแล้วค่ะ ✨', 'success');
+            closeSuperAdminEditModal();
+            loadProcessedApprovalData();
+        } catch (err) {
+            console.error("SuperAdmin Reset Error:", err);
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถคืนค่าสถานะได้ค่ะ', 'error');
+        }
+    }
+}
+
+// 3. ยกเลิก / ลบรายการ
+async function superAdminConfirmDelete() {
+    const reqId = document.getElementById('superAdminEditReqId').value;
+    if (!reqId) return;
+
+    const result = await Swal.fire({
+        title: 'ยืนยันการยกเลิก/ลบรายการ?',
+        text: 'การลบจะทำให้ข้อมูล OT นี้ถูกลบออกจากระบบอย่างถาวร และชั่วโมงโอทีจะถูกตัดออกจากรายงานและสถิติโดยอัตโนมัติค่ะ',
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ใช่, ลบรายการ',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+        Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        try {
+            await supabaseClient.from('approval_steps').delete().eq('request_id', reqId);
+            const { error } = await supabaseClient.from('ot_requests').delete().eq('id', reqId);
+            
+            if (error) throw error;
+            
+            Swal.fire('สำเร็จ', 'ลบรายการโอทีออกจากระบบเรียบร้อยแล้วค่ะ ✨', 'success');
+            closeSuperAdminEditModal();
+            loadProcessedApprovalData();
+        } catch (err) {
+            console.error("SuperAdmin Delete Error:", err);
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถลบรายการได้ค่ะ', 'error');
+        }
     }
 }
