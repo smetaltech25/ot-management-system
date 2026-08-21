@@ -1151,7 +1151,7 @@ async function openOTDetailModal(reqId) {
     try {
         const { data: reqData, error: reqErr } = await supabaseClient
             .from('ot_requests')
-            .select('id, user_id, ot_type_id, date_start, description, status')
+            .select('id, user_id, ot_type_id, date_start, description, status, submit_date')
             .eq('id', reqId)
             .single();
         if (reqErr) throw reqErr;
@@ -1201,6 +1201,15 @@ async function openOTDetailModal(reqId) {
 
         document.getElementById('modalEmpDept').innerHTML = `หน่วยงาน: ${agencyName} <br> ฝ่าย: ${deptName}`;
         document.getElementById('modalReqId').innerText = reqData.id;
+
+        let showSubmitDate = reqData.submit_date || '-';
+        if (showSubmitDate !== '-' && showSubmitDate.includes('-') && !showSubmitDate.includes('/')) {
+            const [dPart, tPart] = showSubmitDate.split(' ');
+            const parts = dPart.split('-');
+            showSubmitDate = `${parts[2]}/${parts[1]}/${parts[0]}` + (tPart ? ` : ${tPart.substring(0, 5)}` : '');
+        }
+        const submitDateEl = document.getElementById('modalSubmitDate');
+        if (submitDateEl) submitDateEl.innerText = showSubmitDate;
 
         let showDate = reqData.date_start;
         if (showDate && showDate.includes('-')) {
