@@ -1,6 +1,16 @@
-# Supabase Auth + RLS rollout (ฉบับกระชับ)
+# Supabase Auth + RLS rollout
 
-> ไฟล์ในโฟลเดอร์นี้เป็น **Draft สำหรับตรวจสอบเท่านั้น** ห้ามรันบน Production จนกว่า Frontend จะเปลี่ยนไปใช้ Supabase Auth และผ่านการทดสอบบน Staging
+> Production Cutover ได้รับอนุมัติและดำเนินการวันที่ 24/08/2026 โดยยังคงคอลัมน์ Password เดิมไว้ชั่วคราวสำหรับ Emergency rollback
+
+## สถานะ Production (24/08/2026)
+
+- ผูก Supabase Auth กับ Profile ครบ 74/74 บัญชี ไม่มี Broken link, Duplicate link หรือ Orphan Auth user
+- รหัสเดิมตัวเลข 4 หลักจำนวน 72 บัญชีใช้ Compatibility `legacy-4-digit-v1`; ผู้ใช้ยังกรอกรหัสเดิมได้
+- เปิด RLS ครบ 10 ตาราง มี 28 Public policies และ 4 Avatar storage policies
+- ถอน Legacy permissive policies และปิด `anon` access แล้ว
+- ทดสอบ Login ผ่านสำหรับ SuperAdmin รหัสเดิม 4 หลัก, SuperAdmin รหัสปกติ และ User รหัสเดิม 4 หลัก
+- ทดสอบผ่าน: Self profile, Company calendar visibility, Password column denial และ User ไม่สามารถแก้ Profile ผู้อื่น
+- Deploy Edge Function `admin-user` บน Production แล้ว และทดสอบว่าเฉพาะ SuperAdmin ผ่าน Authorization
 
 ## สถานะ Staging (18/08/2026)
 
@@ -18,7 +28,38 @@
 - Audit ผ่าน: Active user ที่ไม่ผูก Auth = 0, `anon` อ่าน `users` ไม่ได้ และผู้ใช้ที่ Login แล้วอ่าน `password` ไม่ได้
 - ทดสอบผ่าน: Login 4 Role, ส่งคำขอ, อนุมัติ Step 1 → 2 → 3, ปฏิทิน, รายงาน และหน้าจัดการผู้ใช้
 
-## สิ่งที่ตรวจพบ
+## การจัดการ Password แบบ Supabase Auth (เตรียมใน Codebase 24/08/2026)
+
+- Frontend รองรับ `OMS_AUTH_MODE = 'supabase'`: Login ผ่าน `signInWithPassword()` และใช้ Session ของ Supabase Auth
+- หน้าเพิ่มผู้ใช้ยังรับ Password สำหรับสร้างบัญชีใหม่ แต่ไม่บันทึก Password จริงลง `public.users`
+- หน้าแก้ไขไม่โหลด Password เดิม ช่อง Password จะว่าง และส่งค่าเฉพาะเมื่อต้องการตั้งรหัสใหม่
+- Edge Function `supabase/functions/admin-user/index.ts` ตรวจผู้เรียกจาก JWT และยอมให้เฉพาะ Profile ที่เป็น `SuperAdmin`
+- Edge Function ใช้ Admin API สร้าง/แก้ Supabase Auth user และเชื่อมกับ `users.auth_user_id`
+- `005_admin_user_auth.sql` เพิ่มตัวสร้าง `USER-xxx` แบบใช้ Sequence โดยไม่ลบคอลัมน์ Password เดิม
+- การลบผู้ใช้ยังคงเป็น Workflow เดิมและยังไม่ลบบัญชีใน Supabase Auth; แนะนำปิดสถานะจนกว่าจะอนุมัติ Delete Workflow แยก
+- Production เดิมมี Password ตัวเลข 4 หลัก 72 บัญชี: หน้า Login จะแปลงค่าเดิมด้วย SHA-256 compatibility (`legacy-4-digit-v1`) ก่อนส่ง Supabase Auth ผู้ใช้จึงกรอกรหัสเดิมได้
+- บัญชีใหม่และการตั้ง Password ใหม่บังคับอย่างน้อย 6 ตัวอักษรและไม่เกิน 72 bytes; compatibility ใช้เฉพาะค่าตัวเลข 4 หลักเดิมเท่านั้น
+- ใน Auth mode ซ่อนปุ่มลบผู้ใช้ชั่วคราวเพื่อป้องกัน Auth account กำพร้า โดยยังปิด `status` ได้ตามเดิม
+
+### ก่อนทดสอบ Auth User Management บน Staging
+
+1. เปิดผ่าน `localhost` เพื่อให้ `config.js` เลือก Staging อัตโนมัติ ส่วน GitHub Pages ใช้ Production; ทั้งสอง Environment ใช้ `OMS_AUTH_MODE = 'supabase'`
+2. รัน `005_admin_user_auth.sql` บน Staging
+3. Deploy Function ชื่อ `admin-user` จาก `supabase/functions/admin-user`
+4. ตรวจว่า SuperAdmin ที่ใช้ทดสอบมี `users.auth_user_id`, `role = 'SuperAdmin'` และ `status = true`
+5. ทดสอบเพิ่มผู้ใช้, Login ด้วยบัญชีใหม่, แก้ Profileโดยเว้น Password และตั้ง Password ใหม่
+
+### Production migration
+
+1. Link CLI ไปยัง Production และรัน `001_prepare_auth.sql` กับ `005_admin_user_auth.sql`
+2. รัน `migrate_production_auth.ps1 -ProjectRef <production-ref>`; Script ไม่แสดง Password และ Rollback บัญชีที่สร้างในรอบนั้นอัตโนมัติเมื่อเกิดข้อผิดพลาด
+3. ตรวจว่า Active profile ทุกบัญชีเชื่อม `auth_user_id` แล้ว จึงรัน `002_enable_rls.sql`
+4. Deploy `admin-user` ไป Production แล้วทดสอบ Login, RLS, Workflow และ Password reset ก่อนเปิด GitHub Pages
+5. เก็บ Password เดิมใน `public.users` ไว้ชั่วคราวสำหรับ Emergency rollback โดย RLS ห้าม Client อ่านคอลัมน์นี้
+
+> ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
+
+## สิ่งที่ตรวจพบก่อน Migration
 
 - Login ปัจจุบันอ่าน `public.users.username/password` ด้วย `anon` key
 - Session ปัจจุบันเก็บข้อมูลผู้ใช้ทั้งแถวใน `localStorage`

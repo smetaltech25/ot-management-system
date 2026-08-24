@@ -27,6 +27,9 @@ let currentUser = null;
 let finalSelectedApprovers = []; 
 let tempSelectedApprovers = [];  
 
+const OMS_USER_SAFE_COLUMNS = 'id, username, employee_id, fullname, avatar_url, agency, department, role, status';
+const OMS_USER_AUTH_SAFE_COLUMNS = `id, auth_user_id, username, employee_id, fullname, avatar_url, agency, department, role, status`;
+
 const MY_OT_REQUESTS_PAGE_SIZE = 10;
 let myOTDashboardRequests = [];
 let myOTDashboardOTTypeMap = new Map();
@@ -149,6 +152,71 @@ function getAvatarUrl(fullname, url) {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent((fullname || 'U').charAt(0))}&background=f1f5f9&color=64748b&size=128`;
 }
 
+function isSupabaseAuthMode() {
+    return typeof OMS_AUTH_MODE !== 'undefined' && OMS_AUTH_MODE === 'supabase';
+}
+
+async function usernameToAuthEmail(username) {
+    const normalized = String(username || '').trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return normalized;
+
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+    const hash = Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    return `oms-${hash.slice(0, 40)}@auth.smetaltech.test`;
+}
+
+async function passwordToAuthPassword(password) {
+    const value = String(password ?? '');
+    if (!/^\d{4}$/.test(value)) return value;
+
+    // Transitional compatibility for the 4-digit legacy passwords already in Production.
+    // New and reset passwords are still required to contain at least 6 characters.
+    const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(`oms-legacy-v1:${value}`)
+    );
+    return Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+function showAuthenticatedDashboard(user) {
+    currentUser = user;
+    document.getElementById("headerFullname").innerText = user.fullname;
+    document.getElementById("headerRole").innerText = getUserOrganizationLabel(user);
+
+    const avatarCircle = document.getElementById("userAvatarCircle");
+    avatarCircle.classList.add("overflow-hidden");
+    avatarCircle.replaceChildren();
+    if (user.avatar_url) {
+        const image = document.createElement('img');
+        image.src = user.avatar_url;
+        image.alt = user.fullname || 'User avatar';
+        image.className = 'w-full h-full object-cover';
+        avatarCircle.appendChild(image);
+    } else {
+        avatarCircle.textContent = (user.fullname || 'U').charAt(0);
+    }
+
+    updateRoleSpecificUI(user.role);
+    document.getElementById("pageformLogin").style.display = "none";
+    document.getElementById("dashboardPage").style.display = "block";
+    changePage(1);
+}
+
+async function fetchAuthenticatedProfile(authUserId) {
+    const { data, error } = await supabaseClient
+        .from('users')
+        .select(OMS_USER_AUTH_SAFE_COLUMNS)
+        .eq('auth_user_id', authUserId)
+        .eq('status', true)
+        .single();
+    if (error || !data) throw error || new Error('ไม่พบข้อมูลพนักงานที่เปิดใช้งาน');
+    return data;
+}
+
 // ----------------===================================
 // 1. ระบบเข้าสู่ระบบ & ตรวจสอบสิทธิ์ (Authentication & RBAC)
 // ----------------===================================
@@ -162,44 +230,42 @@ async function loginUsersSupabase() {
     }
 
     try {
-        const { data, error } = await supabaseClient
-            .from('users')
-            .select('*')
-            .eq('username', usernameInput)
-            .eq('password', passwordInput)
-            .eq('status', true)
-            .single();
+        let profile;
+        if (isSupabaseAuthMode()) {
+            const email = await usernameToAuthEmail(usernameInput);
+            const authPassword = await passwordToAuthPassword(passwordInput);
+            const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+                email,
+                password: authPassword
+            });
+            if (authError || !authData.user) throw authError || new Error('เข้าสู่ระบบไม่สำเร็จ');
 
-        if (error || !data) {
-            Swal.fire('เข้าสู่ระบบไม่สำเร็จ', '⚠️ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีอาจจะยังไม่เปิดใช้งานค่ะ', 'error');
-            return;
-        }
-
-        currentUser = data;
-        localStorage.setItem('oms_user_session', JSON.stringify(data)); // ✨ เพิ่มบรรทัดนี้: จำการล็อกอินลงในเครื่อง
-        
-        document.getElementById("headerFullname").innerText = data.fullname;
-        document.getElementById("headerRole").innerText = getUserOrganizationLabel(data);
-        
-        // ✨ อัปเดตรูปมุมขวาบน ✨
-        const avatarCircle = document.getElementById("userAvatarCircle");
-        avatarCircle.classList.add("overflow-hidden"); 
-        if(data.avatar_url) {
-            avatarCircle.innerHTML = `<img src="${data.avatar_url}" class="w-full h-full object-cover">`;
+            try {
+                profile = await fetchAuthenticatedProfile(authData.user.id);
+            } catch (profileError) {
+                await supabaseClient.auth.signOut();
+                throw profileError;
+            }
+            localStorage.removeItem('oms_user_session');
         } else {
-            avatarCircle.innerHTML = data.fullname.charAt(0);
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('username', usernameInput)
+                .eq('password', passwordInput)
+                .eq('status', true)
+                .single();
+            if (error || !data) throw error || new Error('เข้าสู่ระบบไม่สำเร็จ');
+
+            profile = data;
+            localStorage.setItem('oms_user_session', JSON.stringify(data));
         }
 
-        updateRoleSpecificUI(data.role);
-
-        document.getElementById("pageformLogin").style.display = "none";
-        document.getElementById("dashboardPage").style.display = "block";
-
-        changePage(1);
+        showAuthenticatedDashboard(profile);
 
     } catch (err) {
         console.error("Login System Error:", err);
-        Swal.fire('ข้อผิดพลาด', 'อุ๊ย! เกิดข้อผิดพลาดของระบบล็อกอินนิดหน่อยค่ะ ลองใหม่อีกครั้งนะคะ', 'error');
+        Swal.fire('เข้าสู่ระบบไม่สำเร็จ', '⚠️ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีอาจจะยังไม่เปิดใช้งานค่ะ', 'error');
     }
 }
 
@@ -823,7 +889,7 @@ async function openApproverModal() {
     document.getElementById('approverModal').classList.remove('hidden');
     
     try {
-        const { data: users, error } = await supabaseClient.from('users').select('*').eq('status', true);
+        const { data: users, error } = await supabaseClient.from('users').select(OMS_USER_SAFE_COLUMNS).eq('status', true);
         if (error) throw error;
         
         const approvers = users.filter(u => u.role !== 'User');
@@ -1120,7 +1186,12 @@ function closeRequestFormModal() {
 // ----------------===================================
 // 6. ระบบออกจากระบบ (Logout Session Handler)
 // ----------------===================================
-function logoutUsers() {
+async function logoutUsers() {
+    if (isSupabaseAuthMode()) {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) console.warn('Supabase sign out warning:', error);
+    }
+
     // ✨ โชว์ SweetAlert ก่อน แล้วค่อยตัดระบบไปหน้า Login
     Swal.fire({
         title: 'ออกจากระบบสำเร็จ',
@@ -1519,7 +1590,7 @@ async function editMyOTRequest(reqId) {
         finalSelectedApprovers = [];
         if (stepsData && stepsData.length > 0) {
             const approverIds = stepsData.map(s => s.approver_id);
-            const { data: approvers } = await supabaseClient.from('users').select('*').in('id', approverIds);
+            const { data: approvers } = await supabaseClient.from('users').select(OMS_USER_SAFE_COLUMNS).in('id', approverIds);
             
             stepsData.forEach(step => {
                 const user = approvers.find(u => u.id === step.approver_id);
@@ -1964,7 +2035,7 @@ function searchTable(inputId, tbodyId) {
 async function loadUsersData() {
     try {
         const [usersRes, agenciesRes, departmentsRes] = await Promise.all([
-            supabaseClient.from('users').select('*').order('id', { ascending: true }),
+            supabaseClient.from('users').select(isSupabaseAuthMode() ? OMS_USER_AUTH_SAFE_COLUMNS : OMS_USER_SAFE_COLUMNS).order('id', { ascending: true }),
             supabaseClient.from('agency').select('*').order('id', { ascending: true }),
             supabaseClient.from('departments').select('*').order('id', { ascending: true })
         ]);
@@ -2021,7 +2092,7 @@ async function loadUsersData() {
                     <td class="p-3 text-center">${statusBadge}</td>
                     <td class="p-3 text-center">
                         <button onclick="openUserModal('${u.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>
+                        ${isSupabaseAuthMode() ? '' : `<button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>`}
                     </td>
                 </tr>
             `;
@@ -2065,6 +2136,16 @@ async function openUserModal(id = null) {
     document.getElementById("formRole").value = "User";
     document.getElementById("formStatus").checked = true;
 
+    const passwordInput = document.getElementById("formPassword");
+    const passwordLabel = document.getElementById("formPasswordLabel");
+    const passwordHelp = document.getElementById("formPasswordHelp");
+    passwordInput.required = !id || !isSupabaseAuthMode();
+    passwordInput.placeholder = id && isSupabaseAuthMode()
+        ? "อย่างน้อย 6 ตัวอักษร (ถ้าต้องการเปลี่ยน)"
+        : "ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร";
+    passwordLabel.textContent = id && isSupabaseAuthMode() ? "ตั้งรหัสผ่านใหม่" : "Password";
+    passwordHelp.classList.toggle("hidden", !(id && isSupabaseAuthMode()));
+
     // ✨ เคลียร์ส่วนอัปโหลดรูปรอไว้
     selectedAvatarFile = null; 
     document.getElementById("uploadAvatarInput").value = ""; 
@@ -2102,11 +2183,16 @@ async function openUserModal(id = null) {
     if (id) {
         title.innerHTML = "<i class='bx bxs-user-detail mr-2'></i>แก้ไขข้อมูลผู้ใช้งาน";
         try {
-            const { data } = await supabaseClient.from('users').select('*').eq('id', id).single();
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select(isSupabaseAuthMode() ? OMS_USER_AUTH_SAFE_COLUMNS : '*')
+                .eq('id', id)
+                .single();
+            if (error) throw error;
             if (data) {
                 document.getElementById("formUserId").value = data.id;
                 document.getElementById("formUsername").value = data.username;
-                document.getElementById("formPassword").value = data.password;
+                document.getElementById("formPassword").value = isSupabaseAuthMode() ? "" : (data.password || "");
                 document.getElementById("formEmployeeId").value = data.employee_id ?? "";
                 const normalizedFullname = String(data.fullname || "").trim().replace(/\s+/g, " ");
                 const fullnameParts = normalizedFullname ? normalizedFullname.split(" ") : [];
@@ -2133,9 +2219,28 @@ async function openUserModal(id = null) {
 
 function closeUserModal() { document.getElementById("userFormModal").classList.add("hidden"); }
 
-async function saveUserData() {
+async function invokeAdminUserFunction(action, profile, password) {
+    const { data, error } = await supabaseClient.functions.invoke('admin-user', {
+        body: { action, profile, password }
+    });
+
+    if (error) {
+        let message = error.message || 'เรียก Admin User Function ไม่สำเร็จ';
+        try {
+            const errorBody = await error.context?.json();
+            if (errorBody?.error) message = errorBody.error;
+        } catch (_) {
+            // Response body may already be consumed; keep the Supabase error message.
+        }
+        throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data?.user;
+}
+
+async function saveUserData(event) {
     const id = document.getElementById("formUserId").value;
-    const btnSave = event.currentTarget || event.target; 
+    const btnSave = event?.currentTarget || event?.target;
     const originalBtnText = btnSave.innerHTML; 
 
     const username = document.getElementById("formUsername").value.trim();
@@ -2151,8 +2256,17 @@ async function saveUserData() {
     
     let finalAvatarUrl = document.getElementById("formAvatarUrl").value;
 
-    if (!username || !password || !firstName || !lastName) {
-        Swal.fire('ข้อมูลไม่ครบ', 'อย่าลืมกรอก Username, Password, ชื่อ และนามสกุลให้ครบถ้วนนะคะ 🥺', 'warning'); 
+    const passwordIsRequired = !id || !isSupabaseAuthMode();
+    if (!username || (passwordIsRequired && !password) || !firstName || !lastName) {
+        const requiredFields = passwordIsRequired
+            ? 'Username, Password, ชื่อ และนามสกุล'
+            : 'Username, ชื่อ และนามสกุล';
+        Swal.fire('ข้อมูลไม่ครบ', `อย่าลืมกรอก ${requiredFields} ให้ครบถ้วนนะคะ 🥺`, 'warning');
+        return;
+    }
+
+    if (password && (Array.from(password).length < 6 || new TextEncoder().encode(password).length > 72)) {
+        Swal.fire('Password ไม่ถูกต้อง', 'Password ต้องมีความยาวตั้งแต่ 6 ตัวอักษร และไม่เกิน 72 bytes ค่ะ', 'warning');
         return;
     }
 
@@ -2185,9 +2299,8 @@ async function saveUserData() {
         }
 
         // ✨ ขั้นตอนที่ 2: เตรียมแพ็กเกจข้อมูล (พี่ต้นข้ามบรรทัดนี้ไปค่ะ เลยเอามาเติมให้แล้ว)
-        const payload = {
+        const profilePayload = {
             username: username,
-            password: password,
             employee_id: employeeId || null,
             fullname: fullname,
             avatar_url: finalAvatarUrl, 
@@ -2198,32 +2311,39 @@ async function saveUserData() {
         };
 
         // ✨ ขั้นตอนที่ 3: ตรวจสอบว่าเป็นการแก้ไขหรือเพิ่มใหม่
-        if (id) {
-            const { error: updateError } = await supabaseClient.from('users').update(payload).eq('id', id);
-            if (updateError) throw updateError;
+        if (isSupabaseAuthMode()) {
+            await invokeAdminUserFunction(
+                id ? 'update' : 'create',
+                id ? { ...profilePayload, id } : profilePayload,
+                password || null
+            );
         } else {
-            // ถ้ารหัสพนักงานใหม่ ให้ไปหารหัสล่าสุดมาก่อน
-            const { data: lastUser, error: lastUserErr } = await supabaseClient
-                .from('users')
-                .select('id')
-                .order('id', { ascending: false })
-                .limit(1);
+            const legacyPayload = { ...profilePayload, password };
+            if (id) {
+                const { error: updateError } = await supabaseClient.from('users').update(legacyPayload).eq('id', id);
+                if (updateError) throw updateError;
+            } else {
+                // ถ้ารหัสพนักงานใหม่ ให้ไปหารหัสล่าสุดมาก่อน
+                const { data: lastUser, error: lastUserErr } = await supabaseClient
+                    .from('users')
+                    .select('id')
+                    .order('id', { ascending: false })
+                    .limit(1);
 
-            if (lastUserErr) throw lastUserErr;
+                if (lastUserErr) throw lastUserErr;
 
-            let newId = "USER-001"; // ค่าเริ่มต้น
+                let newId = "USER-001";
+                if (lastUser && lastUser.length > 0) {
+                    const lastIdStr = lastUser[0].id;
+                    const lastNum = parseInt(lastIdStr.split('-')[1], 10);
+                    const nextNum = lastNum + 1;
+                    newId = "USER-" + String(nextNum).padStart(3, '0');
+                }
 
-            if (lastUser && lastUser.length > 0) {
-                const lastIdStr = lastUser[0].id;
-                const lastNum = parseInt(lastIdStr.split('-')[1], 10); 
-                const nextNum = lastNum + 1; 
-                newId = "USER-" + String(nextNum).padStart(3, '0'); 
+                legacyPayload.id = newId;
+                const { error: insertError } = await supabaseClient.from('users').insert([legacyPayload]);
+                if (insertError) throw insertError;
             }
-
-            payload.id = newId; // ใส่รหัสใหม่เข้าไปใน payload
-            
-            const { error: insertError } = await supabaseClient.from('users').insert([payload]);
-            if (insertError) throw insertError;
         }
         
         closeUserModal();
@@ -3284,35 +3404,31 @@ function updateDarkModeKnob(isDark) {
 }
 
 // ตรวจสอบโหมดตอนเปิดเว็บครั้งแรก
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // (โค้ดฟังก์ชัน Dark Mode เดิมของพี่ต้นปล่อยไว้เหมือนเดิมนะคะ) ...
+
+    if (isSupabaseAuthMode()) {
+        localStorage.removeItem('oms_user_session');
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) console.warn('Restore Supabase session warning:', error);
+
+        if (session?.user) {
+            try {
+                const profile = await fetchAuthenticatedProfile(session.user.id);
+                showAuthenticatedDashboard(profile);
+            } catch (profileError) {
+                console.warn('Restore OMS profile warning:', profileError);
+                await supabaseClient.auth.signOut();
+            }
+        }
+        return;
+    }
 
     // ✨ โค้ดเพิ่มใหม่: เช็คว่ามีการจำล็อกอินไว้ไหม ถ้าระบบจำไว้ ให้พาเข้าสู่ระบบเลยแบบไม่ต้องกรอกรหัส!
     const savedSession = localStorage.getItem('oms_user_session');
     if (savedSession) {
         const data = JSON.parse(savedSession);
-        currentUser = data;
-        
-        // จัดการแสดงผลข้อมูล User บน Header
-        document.getElementById("headerFullname").innerText = data.fullname;
-        document.getElementById("headerRole").innerText = getUserOrganizationLabel(data);
-        
-        // อัปเดตรูปโปรไฟล์มุมขวา
-        const avatarCircle = document.getElementById("userAvatarCircle");
-        avatarCircle.classList.add("overflow-hidden"); 
-        if(data.avatar_url) {
-            avatarCircle.innerHTML = `<img src="${data.avatar_url}" class="w-full h-full object-cover">`;
-        } else {
-            avatarCircle.innerHTML = data.fullname.charAt(0);
-        }
-
-        // จัดการเมนูต่างๆ ตามสิทธิ์
-        updateRoleSpecificUI(data.role);
-
-        // ปิดหน้าล็อกอิน เปิดหน้า Dashboard
-        document.getElementById("pageformLogin").style.display = "none";
-        document.getElementById("dashboardPage").style.display = "block";
-        changePage(1);
+        showAuthenticatedDashboard(data);
     }
 });
 

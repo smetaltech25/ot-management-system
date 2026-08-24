@@ -269,6 +269,49 @@ alter table public.day_of_week enable row level security;
 alter table public.attachments enable row level security;
 alter table public.users_menu enable row level security;
 
+-- Remove the permissive legacy policies found in Production. Policies are
+-- additive, so leaving any of these in place would bypass the stricter rules.
+drop policy if exists "Allow All for Authenticated" on public.users;
+drop policy if exists "Allow All for Authenticated" on public.ot_requests;
+drop policy if exists "Allow All for Authenticated" on public.attachments;
+drop policy if exists "Read Only for Users" on public.agency;
+drop policy if exists "Read Only for Users" on public.approval_steps;
+drop policy if exists "Read Only for Users" on public.day_of_week;
+drop policy if exists "Read Only for Users" on public.departments;
+drop policy if exists "Read Only for Users" on public.holidays;
+drop policy if exists "Read Only for Users" on public.ot_types;
+drop policy if exists "Read Only for Users" on public.users_menu;
+
+-- Make the application policies safe to re-run during a controlled cutover.
+drop policy if exists users_authenticated_read on public.users;
+drop policy if exists users_superadmin_insert on public.users;
+drop policy if exists users_superadmin_update on public.users;
+drop policy if exists users_superadmin_delete on public.users;
+drop policy if exists ot_requests_read_scope on public.ot_requests;
+drop policy if exists ot_requests_owner_insert on public.ot_requests;
+drop policy if exists ot_requests_owner_edit_pending on public.ot_requests;
+drop policy if exists ot_requests_privileged_update on public.ot_requests;
+drop policy if exists ot_requests_owner_delete_pending on public.ot_requests;
+drop policy if exists approval_steps_read_scope on public.approval_steps;
+drop policy if exists approval_steps_requester_insert on public.approval_steps;
+drop policy if exists approval_steps_assignee_update on public.approval_steps;
+drop policy if exists approval_steps_requester_delete_pending on public.approval_steps;
+drop policy if exists agency_authenticated_read on public.agency;
+drop policy if exists agency_superadmin_write on public.agency;
+drop policy if exists departments_authenticated_read on public.departments;
+drop policy if exists departments_superadmin_write on public.departments;
+drop policy if exists ot_types_authenticated_read on public.ot_types;
+drop policy if exists ot_types_superadmin_write on public.ot_types;
+drop policy if exists holidays_authenticated_read on public.holidays;
+drop policy if exists holidays_superadmin_write on public.holidays;
+drop policy if exists day_of_week_authenticated_read on public.day_of_week;
+drop policy if exists day_of_week_superadmin_write on public.day_of_week;
+drop policy if exists attachments_read_scope on public.attachments;
+drop policy if exists attachments_owner_insert on public.attachments;
+drop policy if exists attachments_owner_delete on public.attachments;
+drop policy if exists users_menu_authenticated_read on public.users_menu;
+drop policy if exists users_menu_superadmin_write on public.users_menu;
+
 -- USERS: active directory is readable; only SuperAdmin manages profiles.
 create policy users_authenticated_read
 on public.users for select to authenticated
@@ -392,6 +435,15 @@ grant select, insert, update, delete on public.agency, public.departments,
     public.users_menu to authenticated;
 
 -- Supabase Storage: profile images remain readable; only SuperAdmin can mutate avatars.
+drop policy if exists "Allow Public Access 1oj01fe_0" on storage.objects;
+drop policy if exists "Allow Public Access 1oj01fe_1" on storage.objects;
+drop policy if exists "Allow Public Access 1oj01fe_2" on storage.objects;
+drop policy if exists "Allow Public Access 1oj01fe_3" on storage.objects;
+drop policy if exists avatars_authenticated_read on storage.objects;
+drop policy if exists avatars_superadmin_insert on storage.objects;
+drop policy if exists avatars_superadmin_update on storage.objects;
+drop policy if exists avatars_superadmin_delete on storage.objects;
+
 create policy avatars_authenticated_read
 on storage.objects for select to authenticated
 using (bucket_id = 'avatars');
