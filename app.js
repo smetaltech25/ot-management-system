@@ -29,6 +29,7 @@ let tempSelectedApprovers = [];
 
 const OMS_USER_SAFE_COLUMNS = 'id, username, employee_id, fullname, avatar_url, agency, department, role, status';
 const OMS_USER_AUTH_SAFE_COLUMNS = `id, auth_user_id, username, employee_id, fullname, avatar_url, agency, department, role, status`;
+const OMS_PROTECTED_SYSTEM_USER_IDS = new Set(['USER-002', 'USER-004']);
 
 const MY_OT_REQUESTS_PAGE_SIZE = 10;
 let myOTDashboardRequests = [];
@@ -2096,7 +2097,9 @@ async function loadUsersData() {
                     <td class="p-3 text-center">${statusBadge}</td>
                     <td class="p-3 text-center">
                         <button onclick="openUserModal('${u.id}')" class="dashboard-action-btn dashboard-btn-orange w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1" title="แก้ไข"><i class='bx bx-edit text-sm'></i></button>
-                        ${isSupabaseAuthMode() ? '' : `<button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>`}
+                        ${isSupabaseAuthMode() && OMS_PROTECTED_SYSTEM_USER_IDS.has(u.id)
+                            ? `<button type="button" disabled class="dashboard-action-btn w-8 h-8 bg-slate-100 text-slate-300 rounded-lg cursor-not-allowed" title="บัญชีผู้ดูแลระบบหลักไม่สามารถลบได้"><i class='bx bx-lock-alt text-sm'></i></button>`
+                            : `<button onclick="deleteUserData('${u.id}', '${u.fullname}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="ลบ"><i class='bx bx-trash text-sm'></i></button>`}
                     </td>
                 </tr>
             `;
@@ -2365,9 +2368,14 @@ async function saveUserData(event) {
 }
 
 async function deleteUserData(id, name) {
+    if (isSupabaseAuthMode() && OMS_PROTECTED_SYSTEM_USER_IDS.has(id)) {
+        Swal.fire('ไม่สามารถลบได้', 'บัญชีผู้ดูแลระบบหลัก po2 และ admin สามารถแก้ไขได้ แต่ไม่สามารถลบค่ะ', 'warning');
+        return;
+    }
+
     const result = await Swal.fire({
         title: 'ยืนยันการลบ?',
-        text: `ต้องการลบผู้ใช้งาน "${name}" ใช่หรือไม่?\n⚠️ การลบอาจทำให้ข้อมูลประวัติ OT ของคนนี้หายไปด้วยนะคะ ไนท์แนะนำให้ใช้วิธี 'ปิดสถานะการใช้งาน' แทนค่ะ`,
+        text: `ต้องการลบผู้ใช้งาน "${name}" ใช่หรือไม่? หากมีประวัติ OT ขั้นตอนอนุมัติ หรือไฟล์แนบ ระบบจะไม่อนุญาตให้ลบและแนะนำให้ปิดสถานะแทนค่ะ`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -2379,10 +2387,17 @@ async function deleteUserData(id, name) {
     if (!result.isConfirmed) return;
 
     try {
-        await supabaseClient.from('users').delete().eq('id', id);
-        loadUsersData();
-        Swal.fire('สำเร็จ', 'ลบข้อมูลสำเร็จค๊าา', 'success');
-    } catch (err) { Swal.fire('ข้อผิดพลาด', 'ลบไม่สำเร็จค่ะ ติดข้อมูลที่ผูกไว้', 'error'); }
+        if (isSupabaseAuthMode()) {
+            await invokeAdminUserFunction('delete', { id }, null);
+        } else {
+            const { error } = await supabaseClient.from('users').delete().eq('id', id);
+            if (error) throw error;
+        }
+        await loadUsersData();
+        Swal.fire('สำเร็จ', 'ลบผู้ใช้งานและบัญชีเข้าสู่ระบบเรียบร้อยแล้วค่ะ', 'success');
+    } catch (err) {
+        Swal.fire('ลบไม่สำเร็จ', err.message || 'บัญชีนี้มีข้อมูลที่ผูกไว้อยู่ กรุณาปิดสถานะการใช้งานแทนค่ะ', 'error');
+    }
 }
 
 // ===================================================

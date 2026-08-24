@@ -12,6 +12,8 @@
 - ทดสอบผ่าน: Self profile, Company calendar visibility, Password column denial และ User ไม่สามารถแก้ Profile ผู้อื่น
 - Deploy Edge Function `admin-user` บน Production แล้ว และทดสอบว่าเฉพาะ SuperAdmin ผ่าน Authorization
 - เพิ่ม RPC `oms_approval_timeline` ให้ Active user ทุก Role ดูเส้นทางอนุมัติจากปฏิทินบริษัทได้ โดยไม่ขยาย RLS ของตาราง `approval_steps`
+- เพิ่ม RPC `oms_delete_user_profile` และ Edge action `delete`: ลบได้เฉพาะบัญชีที่ไม่มีข้อมูลอ้างอิง พร้อมลบ Supabase Auth และ Rollback Profile หาก Auth deletion ล้มเหลว
+- `USER-002` (po2) และ `USER-004` (admin) เป็นบัญชีระบบถาวร เปลี่ยน Username/Profile ได้แต่ลบไม่ได้ทั้งใน UI, Edge Function และ Database RPC
 
 ## สถานะ Staging (18/08/2026)
 
@@ -58,6 +60,7 @@
 4. Deploy `admin-user` ไป Production แล้วทดสอบ Login, RLS, Workflow และ Password reset ก่อนเปิด GitHub Pages
 5. เก็บ Password เดิมใน `public.users` ไว้ชั่วคราวสำหรับ Emergency rollback โดย RLS ห้าม Client อ่านคอลัมน์นี้
 6. รัน `006_approval_timeline_visibility.sql` เพื่อให้ทุก Role ดู Approval timeline ของรายการในปฏิทินบริษัทได้
+7. รัน `007_delete_auth_user.sql` เพื่อเปิด Delete workflow แบบตรวจ Foreign Key และป้องกันบัญชีระบบหลัก
 
 > ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
 

@@ -7,6 +7,7 @@ const SUPABASE_ADMIN_KEY =
   "";
 
 const ALLOWED_ROLES = new Set(["User", "SuperUser", "Admin", "SuperAdmin"]);
+const PROTECTED_SYSTEM_USER_IDS = new Set(["USER-002", "USER-004"]);
 const SAFE_PROFILE_COLUMNS =
   "id, auth_user_id, username, employee_id, fullname, avatar_url, agency, department, role, status";
 
@@ -119,6 +120,48 @@ Deno.serve(async (request) => {
 
   const action = normalizeText(body?.action, 30);
   const profile = body?.profile || {};
+
+  if (action === "delete") {
+    const id = normalizeText(profile.id, 100);
+    if (!id) return jsonResponse(request, { error: "User id is required" }, 400);
+    if (id === caller.id) {
+      return jsonResponse(request, { error: "ไม่สามารถลบบัญชีที่กำลังเข้าสู่ระบบอยู่ได้" }, 409);
+    }
+    if (PROTECTED_SYSTEM_USER_IDS.has(id)) {
+      return jsonResponse(request, { error: "บัญชีผู้ดูแลระบบหลักไม่สามารถลบได้" }, 409);
+    }
+
+    try {
+      const { data: existingProfile, error: existingError } = await admin
+        .from("users")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (existingError || !existingProfile) throw existingError || new Error("ไม่พบผู้ใช้งาน");
+
+      const { data: deletedAuthUserId, error: deleteProfileError } = await admin
+        .rpc("oms_delete_user_profile", { target_user_id: id });
+      if (deleteProfileError) throw deleteProfileError;
+
+      if (deletedAuthUserId) {
+        const { error: deleteAuthError } = await admin.auth.admin.deleteUser(deletedAuthUserId);
+        if (deleteAuthError) {
+          const { error: restoreError } = await admin.from("users").insert(existingProfile);
+          if (restoreError) {
+            throw new Error(`ลบ Auth ไม่สำเร็จและคืน Profile ไม่สำเร็จ: ${restoreError.message}`);
+          }
+          throw deleteAuthError;
+        }
+      }
+
+      return jsonResponse(request, { deleted: true, id });
+    } catch (error) {
+      console.error("admin-user delete error", error);
+      const message = error instanceof Error ? error.message : String(error || "Delete user failed");
+      return jsonResponse(request, { error: message }, 409);
+    }
+  }
+
   const username = normalizeUsername(profile.username);
   const fullname = normalizeText(profile.fullname, 200);
   const role = normalizeText(profile.role, 30) || "User";
