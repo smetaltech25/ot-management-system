@@ -1,6 +1,6 @@
 # Supabase Auth + RLS rollout
 
-> Production Cutover ได้รับอนุมัติและดำเนินการวันที่ 24/08/2026 โดยยังคงคอลัมน์ Password เดิมไว้ชั่วคราวสำหรับ Emergency rollback
+> Production Cutover ได้รับอนุมัติและดำเนินการวันที่ 24/08/2026 แล้ว ปัจจุบัน Supabase Auth เป็น Credential source เดียว และ `public.users.password` เป็น `NULL`
 
 ## สถานะ Production (24/08/2026)
 
@@ -32,18 +32,18 @@
 - Audit ผ่าน: Active user ที่ไม่ผูก Auth = 0, `anon` อ่าน `users` ไม่ได้ และผู้ใช้ที่ Login แล้วอ่าน `password` ไม่ได้
 - ทดสอบผ่าน: Login 4 Role, ส่งคำขอ, อนุมัติ Step 1 → 2 → 3, ปฏิทิน, รายงาน และหน้าจัดการผู้ใช้
 
-## การจัดการ Password แบบ Supabase Auth (เตรียมใน Codebase 24/08/2026)
+## การจัดการ Password แบบ Supabase Auth (ใช้งานจริง 24/08/2026)
 
 - Frontend รองรับ `OMS_AUTH_MODE = 'supabase'`: Login ผ่าน `signInWithPassword()` และใช้ Session ของ Supabase Auth
 - หน้าเพิ่มผู้ใช้ยังรับ Password สำหรับสร้างบัญชีใหม่ แต่ไม่บันทึก Password จริงลง `public.users`
 - หน้าแก้ไขไม่โหลด Password เดิม ช่อง Password จะว่าง และส่งค่าเฉพาะเมื่อต้องการตั้งรหัสใหม่
 - Edge Function `supabase/functions/admin-user/index.ts` ตรวจผู้เรียกจาก JWT และยอมให้เฉพาะ Profile ที่เป็น `SuperAdmin`
 - Edge Function ใช้ Admin API สร้าง/แก้ Supabase Auth user และเชื่อมกับ `users.auth_user_id`
-- `005_admin_user_auth.sql` เพิ่มตัวสร้าง `USER-xxx` แบบใช้ Sequence โดยไม่ลบคอลัมน์ Password เดิม
-- การลบผู้ใช้ยังคงเป็น Workflow เดิมและยังไม่ลบบัญชีใน Supabase Auth; แนะนำปิดสถานะจนกว่าจะอนุมัติ Delete Workflow แยก
+- `005_admin_user_auth.sql` เพิ่มตัวสร้าง `USER-xxx` แบบใช้ Sequence; `008_null_legacy_passwords.sql` ทำให้คอลัมน์ Password เป็น Nullable และล้างค่าเดิมเป็น `NULL`
+- การลบผู้ใช้ทำผ่าน Edge Function และ `oms_delete_user_profile`; บัญชีที่มีประวัติจะลบไม่ได้และควรปิดสถานะแทน
 - Production เดิมมี Password ตัวเลข 4 หลัก 72 บัญชี: หน้า Login จะแปลงค่าเดิมด้วย SHA-256 compatibility (`legacy-4-digit-v1`) ก่อนส่ง Supabase Auth ผู้ใช้จึงกรอกรหัสเดิมได้
 - บัญชีใหม่และการตั้ง Password ใหม่บังคับอย่างน้อย 6 ตัวอักษรและไม่เกิน 72 bytes; compatibility ใช้เฉพาะค่าตัวเลข 4 หลักเดิมเท่านั้น
-- ใน Auth mode ซ่อนปุ่มลบผู้ใช้ชั่วคราวเพื่อป้องกัน Auth account กำพร้า โดยยังปิด `status` ได้ตามเดิม
+- ใน Auth mode ปุ่มลบเรียก Edge Function เพื่อลบ Profile/Auth เป็นคู่ และป้องกัน `USER-002`/`USER-004` ทั้ง UI, Edge Function และ Database RPC
 
 ### ก่อนทดสอบ Auth User Management บน Staging
 
@@ -59,42 +59,42 @@
 2. รัน `migrate_production_auth.ps1 -ProjectRef <production-ref>`; Script ไม่แสดง Password และ Rollback บัญชีที่สร้างในรอบนั้นอัตโนมัติเมื่อเกิดข้อผิดพลาด
 3. ตรวจว่า Active profile ทุกบัญชีเชื่อม `auth_user_id` แล้ว จึงรัน `002_enable_rls.sql`
 4. Deploy `admin-user` ไป Production แล้วทดสอบ Login, RLS, Workflow และ Password reset ก่อนเปิด GitHub Pages
-5. เก็บ Password เดิมใน `public.users` ไว้ชั่วคราวสำหรับ Emergency rollback โดย RLS ห้าม Client อ่านคอลัมน์นี้
+5. ขั้น Emergency rollback ที่เคยเก็บ Password เดิมสิ้นสุดแล้ว; `008_null_legacy_passwords.sql` ล้างค่าใน `public.users.password` เป็น `NULL`
 6. รัน `006_approval_timeline_visibility.sql` เพื่อให้ทุก Role ดู Approval timeline ของรายการในปฏิทินบริษัทได้
 7. รัน `007_delete_auth_user.sql` เพื่อเปิด Delete workflow แบบตรวจ Foreign Key และป้องกันบัญชีระบบหลัก
 8. รัน `008_null_legacy_passwords.sql` เพื่อให้ `public.users.password` รับค่า `NULL` และล้าง Plaintext Legacy โดยไม่เปลี่ยน Credential ใน Supabase Auth
 
 > ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
 
-## สิ่งที่ตรวจพบก่อน Migration
+## ประวัติก่อน Migration (ดำเนินการ Cutover เสร็จแล้ว)
 
-- Login ปัจจุบันอ่าน `public.users.username/password` ด้วย `anon` key
-- Session ปัจจุบันเก็บข้อมูลผู้ใช้ทั้งแถวใน `localStorage`
-- หน้าเว็บอ่าน `users.select('*')` หลายจุด จึงยังเปิด RLS อย่างปลอดภัยไม่ได้
+- ก่อน Cutover ระบบ Login เคยอ่าน `public.users.username/password` ด้วย `anon` key
+- ก่อน Cutover Session เคยเก็บข้อมูลผู้ใช้ทั้งแถวใน `localStorage`
+- ก่อน Cutover หน้าเว็บเคยอ่าน `users.select('*')` หลายจุด จึงยังเปิด RLS อย่างปลอดภัยไม่ได้
 - Browser เขียน `ot_requests` และ `approval_steps` โดยตรง การอนุมัติควรย้ายเป็น Database RPC เพื่อให้การอัปเดตหลายตารางเป็น Transaction เดียว
 - รูปพนักงานอัปโหลดเข้า Supabase Storage bucket `avatars`
 
-## แผนเร็ว 4 ขั้น
+## แผนเร็ว 4 ขั้น (ดำเนินการเสร็จแล้ว)
 
 1. **Backup + Staging** — ตรวจ Schema จริงและสร้างโครงสร้างทดสอบบน Project แยกโดยไม่คัดลอก Password/ข้อมูลพนักงาน
 2. **Auth** — รัน `001_prepare_auth.sql`, สร้างผู้ใช้ใน Supabase Auth ด้วย Admin API และผูก `users.auth_user_id`
 3. **Frontend** — Localhost ใช้ Supabase Auth, ไม่อ่าน `password` และใช้ RPC สำหรับการอนุมัติแล้ว
-4. **RLS** — เปิดและทดสอบบน Staging แล้ว; ขั้นต่อไปคือเตรียม Production migration/cutover โดยยังไม่ลบข้อมูลเดิม
+4. **RLS** — เปิดและทดสอบบน Staging ก่อน Cutover และเปิด Production สำเร็จวันที่ 24/08/2026
 
-## เงื่อนไขก่อนเปิด RLS
+## เงื่อนไขก่อนเปิด RLS (ผ่านและเปิด Production แล้ว)
 
 - `users.auth_user_id` ของผู้ใช้ที่เปิดใช้งานครบ 100%
-- Frontend ไม่มี `.eq('password', ...)`, ไม่มี `users.select('*')` และไม่เก็บข้อมูลทั้งแถวใน `localStorage`
+- Production Auth path ไม่อ่าน `password`, ใช้ Safe column list และไม่เก็บ Profile ทั้งแถวใน Legacy local session
 - User สร้าง/แก้/ลบเฉพาะคำขอตนเอง แต่ผู้ใช้ที่ Login ทุก Role อ่านภาพรวม OT ของบริษัทผ่านปฏิทินได้
 - ผู้อนุมัติดำเนินการได้เฉพาะ Step ที่มอบหมายและถึงลำดับแล้ว
 - SuperAdmin จัดการผู้ใช้/ข้อมูลตั้งค่าได้
 - Storage `avatars` มี Policy สำหรับอ่านและอัปโหลดตามสิทธิ์
 - ผ่าน Login และงานหลักของ `User`, `SuperUser`, `Admin`, `SuperAdmin`
 
-## ลำดับ Cutover
+## ลำดับ Cutover (ดำเนินการเสร็จแล้ว)
 
 1. Deploy Frontend ที่รองรับ Supabase Auth
 2. เปิด RLS ตารางอ้างอิงก่อน (`agency`, `departments`, `ot_types`, `holidays`, `day_of_week`)
 3. เปิด `users`, `ot_requests`, `approval_steps`, `attachments`, `users_menu`
 4. ตรวจ Login, ส่งคำขอ, อนุมัติบางรายการ/ทั้งหมด, ปฏิทิน, รายงาน และ Export
-5. หลังระบบนิ่งค่อยลบคอลัมน์ `password` (เป็นงานทำลายข้อมูล ต้องอนุมัติแยก)
+5. คงคอลัมน์ `password` ไว้เป็น Nullable เพื่อ Compatibility ของ Schema แต่ล้างค่าทุกแถวเป็น `NULL` ผ่าน `008_null_legacy_passwords.sql`
