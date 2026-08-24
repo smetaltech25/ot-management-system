@@ -1228,6 +1228,14 @@ async function openOTDetailModal(reqId) {
         if (reqErr) throw reqErr;
         if (requestToken !== otDetailRequestToken) return;
 
+        const approvalTimelineRequest = isSupabaseAuthMode()
+            ? supabaseClient.rpc('oms_approval_timeline', { target_request_id: reqId })
+            : supabaseClient
+                .from('approval_steps')
+                .select('approver_id, step_order, status, approved_at, comment')
+                .eq('request_id', reqId)
+                .order('step_order', { ascending: true });
+
         // ข้อมูลทั้ง 3 ส่วนอาศัยเฉพาะ reqData จึงโหลดพร้อมกันได้
         const [userResult, otTypeResult, stepsResult] = await Promise.all([
             supabaseClient
@@ -1240,11 +1248,7 @@ async function openOTDetailModal(reqId) {
                 .select('start_time, end_time, rate')
                 .eq('id', reqData.ot_type_id)
                 .single(),
-            supabaseClient
-                .from('approval_steps')
-                .select('approver_id, step_order, status, approved_at, comment')
-                .eq('request_id', reqId)
-                .order('step_order', { ascending: true })
+            approvalTimelineRequest
         ]);
 
         if (requestToken !== otDetailRequestToken) return;

@@ -11,6 +11,7 @@
 - ทดสอบ Login ผ่านสำหรับ SuperAdmin รหัสเดิม 4 หลัก, SuperAdmin รหัสปกติ และ User รหัสเดิม 4 หลัก
 - ทดสอบผ่าน: Self profile, Company calendar visibility, Password column denial และ User ไม่สามารถแก้ Profile ผู้อื่น
 - Deploy Edge Function `admin-user` บน Production แล้ว และทดสอบว่าเฉพาะ SuperAdmin ผ่าน Authorization
+- เพิ่ม RPC `oms_approval_timeline` ให้ Active user ทุก Role ดูเส้นทางอนุมัติจากปฏิทินบริษัทได้ โดยไม่ขยาย RLS ของตาราง `approval_steps`
 
 ## สถานะ Staging (18/08/2026)
 
@@ -56,6 +57,7 @@
 3. ตรวจว่า Active profile ทุกบัญชีเชื่อม `auth_user_id` แล้ว จึงรัน `002_enable_rls.sql`
 4. Deploy `admin-user` ไป Production แล้วทดสอบ Login, RLS, Workflow และ Password reset ก่อนเปิด GitHub Pages
 5. เก็บ Password เดิมใน `public.users` ไว้ชั่วคราวสำหรับ Emergency rollback โดย RLS ห้าม Client อ่านคอลัมน์นี้
+6. รัน `006_approval_timeline_visibility.sql` เพื่อให้ทุก Role ดู Approval timeline ของรายการในปฏิทินบริษัทได้
 
 > ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
 
