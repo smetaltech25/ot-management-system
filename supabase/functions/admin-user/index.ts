@@ -179,7 +179,6 @@ Deno.serve(async (request) => {
     department: normalizeText(profile.department, 100) || null,
     role,
     status: profile.status !== false,
-    password: "AUTH_MANAGED",
   };
 
   try {
