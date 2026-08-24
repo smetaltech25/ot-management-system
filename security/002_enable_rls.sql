@@ -237,6 +237,93 @@ begin
 end;
 $$;
 
+create or replace function public.oms_superadmin_update_processed_ot(
+    target_request_id text,
+    target_ot_type_id text,
+    target_date_start text,
+    target_description text
+)
+returns table(request_id text, request_status text, ot_type_id text, date_start text, description text)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+    if auth.uid() is null or public.oms_role() <> 'SuperAdmin' then
+        raise exception 'SuperAdmin permission required';
+    end if;
+
+    if nullif(btrim(target_request_id), '') is null
+       or nullif(btrim(target_ot_type_id), '') is null
+       or target_date_start !~ '^\d{4}-\d{2}-\d{2}$' then
+        raise exception 'Invalid processed OT update input';
+    end if;
+
+    if not exists (select 1 from public.ot_types t where t.id = target_ot_type_id) then
+        raise exception 'OT type not found';
+    end if;
+
+    return query
+    update public.ot_requests r
+    set ot_type_id = target_ot_type_id,
+        date_start = target_date_start,
+        description = coalesce(btrim(target_description), '')
+    where r.id = target_request_id
+      and r.status in ('Approved', 'Rejected')
+    returning r.id, r.status, r.ot_type_id, r.date_start, r.description;
+
+    if not found then
+        raise exception 'Processed OT request not found';
+    end if;
+end;
+$$;
+
+create or replace function public.oms_superadmin_reset_processed_ot(target_request_id text)
+returns table(request_id text, request_status text, reset_step_count integer)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    existing_status text;
+    affected_steps integer;
+begin
+    if auth.uid() is null or public.oms_role() <> 'SuperAdmin' then
+        raise exception 'SuperAdmin permission required';
+    end if;
+
+    select r.status
+    into existing_status
+    from public.ot_requests r
+    where r.id = target_request_id
+    for update;
+
+    if not found or existing_status not in ('Approved', 'Rejected') then
+        raise exception 'Processed OT request not found';
+    end if;
+
+    update public.approval_steps s
+    set status = 'Pending',
+        approved_at = null,
+        comment = null
+    where s.request_id = target_request_id;
+
+    get diagnostics affected_steps = row_count;
+    if affected_steps = 0 then
+        raise exception 'Approval workflow not found';
+    end if;
+
+    update public.ot_requests r
+    set status = 'Pending',
+        current_step = 1,
+        rejected_reason = null
+    where r.id = target_request_id;
+
+    return query
+    select target_request_id, 'Pending'::text, affected_steps;
+end;
+$$;
+
 revoke all on function public.oms_user_id() from public, anon;
 revoke all on function public.oms_role() from public, anon;
 revoke all on function public.oms_is_privileged() from public, anon;
@@ -247,6 +334,8 @@ revoke all on function public.oms_can_insert_step(text) from public, anon;
 revoke all on function public.oms_can_delete_request(text) from public, anon;
 revoke all on function public.oms_can_act_step(text) from public, anon;
 revoke all on function public.oms_review_steps(text[], text, text) from public, anon;
+revoke all on function public.oms_superadmin_update_processed_ot(text, text, text, text) from public, anon;
+revoke all on function public.oms_superadmin_reset_processed_ot(text) from public, anon;
 grant execute on function public.oms_user_id() to authenticated;
 grant execute on function public.oms_role() to authenticated;
 grant execute on function public.oms_is_privileged() to authenticated;
@@ -257,6 +346,8 @@ grant execute on function public.oms_can_insert_step(text) to authenticated;
 grant execute on function public.oms_can_delete_request(text) to authenticated;
 grant execute on function public.oms_can_act_step(text) to authenticated;
 grant execute on function public.oms_review_steps(text[], text, text) to authenticated;
+grant execute on function public.oms_superadmin_update_processed_ot(text, text, text, text) to authenticated;
+grant execute on function public.oms_superadmin_reset_processed_ot(text) to authenticated;
 
 alter table public.users enable row level security;
 alter table public.ot_requests enable row level security;
@@ -292,6 +383,7 @@ drop policy if exists ot_requests_owner_insert on public.ot_requests;
 drop policy if exists ot_requests_owner_edit_pending on public.ot_requests;
 drop policy if exists ot_requests_privileged_update on public.ot_requests;
 drop policy if exists ot_requests_owner_delete_pending on public.ot_requests;
+drop policy if exists ot_requests_superadmin_delete_processed on public.ot_requests;
 drop policy if exists approval_steps_read_scope on public.approval_steps;
 drop policy if exists approval_steps_requester_insert on public.approval_steps;
 drop policy if exists approval_steps_assignee_update on public.approval_steps;
@@ -354,6 +446,15 @@ create policy ot_requests_owner_delete_pending
 on public.ot_requests for delete to authenticated
 using (
     public.oms_can_delete_request(id)
+);
+
+-- Only SuperAdmin may permanently delete requests that have already been processed.
+-- Pending request deletion remains governed by ot_requests_owner_delete_pending.
+create policy ot_requests_superadmin_delete_processed
+on public.ot_requests for delete to authenticated
+using (
+    public.oms_role() = 'SuperAdmin'
+    and status in ('Approved', 'Rejected')
 );
 
 -- APPROVAL STEPS: requester sees workflow; assigned reviewer sees/acts on current step.

@@ -6,7 +6,7 @@
 
 - ผูก Supabase Auth กับ Profile ครบ 74/74 บัญชี ไม่มี Broken link, Duplicate link หรือ Orphan Auth user
 - รหัสเดิมตัวเลข 4 หลักจำนวน 72 บัญชีใช้ Compatibility `legacy-4-digit-v1`; ผู้ใช้ยังกรอกรหัสเดิมได้
-- เปิด RLS ครบ 10 ตาราง มี 28 Public policies และ 4 Avatar storage policies
+- เปิด RLS ครบ 10 ตาราง มี 29 Public policies และ 4 Avatar storage policies
 - ถอน Legacy permissive policies และปิด `anon` access แล้ว
 - ทดสอบ Login ผ่านสำหรับ SuperAdmin รหัสเดิม 4 หลัก, SuperAdmin รหัสปกติ และ User รหัสเดิม 4 หลัก
 - ทดสอบผ่าน: Self profile, Company calendar visibility, Password column denial และ User ไม่สามารถแก้ Profile ผู้อื่น
@@ -15,6 +15,8 @@
 - เพิ่ม RPC `oms_delete_user_profile` และ Edge action `delete`: ลบได้เฉพาะบัญชีที่ไม่มีข้อมูลอ้างอิง พร้อมลบ Supabase Auth และ Rollback Profile หาก Auth deletion ล้มเหลว
 - `USER-002` (po2) และ `USER-004` (admin) เป็นบัญชีระบบถาวร เปลี่ยน Username/Profile ได้แต่ลบไม่ได้ทั้งใน UI, Edge Function และ Database RPC
 - ล้าง Password Legacy ใน `public.users.password` เป็น `NULL` และให้ Supabase Auth เป็นแหล่ง Credential เดียว; Edge Function จะไม่เขียน Password ลง Profile อีก
+- เพิ่ม Policy `ot_requests_superadmin_delete_processed`: เฉพาะ Active `SuperAdmin` ลบคำขอที่เป็น `Approved`/`Rejected` ได้ ส่วน Role อื่นยังลบรายการที่ดำเนินการแล้วไม่ได้
+- เพิ่ม RPC `oms_superadmin_update_processed_ot` และ `oms_superadmin_reset_processed_ot`: เฉพาะ Active `SuperAdmin` แก้รายการที่ดำเนินการแล้วหรือดึงกลับเป็น Pending ที่ Step 1 แบบ Transaction ได้
 
 ## สถานะ Staging (18/08/2026)
 
@@ -28,7 +30,7 @@
 - รัน `003_staging_seed.sql` และ `002_enable_rls.sql` บน Staging แล้ว
 - รัน `004_calendar_company_visibility.sql` เพื่อให้ผู้ใช้ที่ Login ทุก Role ดูภาพรวม OT ทุกหน่วยงานในปฏิทินได้ โดยสิทธิแก้ไข/ลบ/อนุมัติยังคงเดิม
 - ตรวจหลัง Migration: Policy `ot_requests_read_scope` เป็น `SELECT true` สำหรับ Role `authenticated`; การจำลอง Role `authenticated` อ่านคำขอทดสอบได้ครบ 2 รายการ และหน้า Calendar ของ `TEST-002` แสดงรายการของ `TEST-001` ได้
-- เปิด RLS ครบ 10 ตาราง มี 28 Policies และ RPC `oms_review_steps`
+- เปิด RLS ครบ 10 ตาราง มี 29 Policies และ RPC `oms_review_steps`
 - Audit ผ่าน: Active user ที่ไม่ผูก Auth = 0, `anon` อ่าน `users` ไม่ได้ และผู้ใช้ที่ Login แล้วอ่าน `password` ไม่ได้
 - ทดสอบผ่าน: Login 4 Role, ส่งคำขอ, อนุมัติ Step 1 → 2 → 3, ปฏิทิน, รายงาน และหน้าจัดการผู้ใช้
 
@@ -63,6 +65,8 @@
 6. รัน `006_approval_timeline_visibility.sql` เพื่อให้ทุก Role ดู Approval timeline ของรายการในปฏิทินบริษัทได้
 7. รัน `007_delete_auth_user.sql` เพื่อเปิด Delete workflow แบบตรวจ Foreign Key และป้องกันบัญชีระบบหลัก
 8. รัน `008_null_legacy_passwords.sql` เพื่อให้ `public.users.password` รับค่า `NULL` และล้าง Plaintext Legacy โดยไม่เปลี่ยน Credential ใน Supabase Auth
+9. รัน `009_superadmin_delete_processed_ot.sql` เพื่อให้เฉพาะ SuperAdmin ลบรายการ `Approved`/`Rejected` จากเมนูดำเนินการแล้วได้
+10. รัน `010_superadmin_processed_ot_actions.sql` เพื่อให้การแก้และดึงกลับรายการที่ดำเนินการแล้วเป็น Transaction และตรวจสิทธิ์ SuperAdmin ที่ Database
 
 > ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
 

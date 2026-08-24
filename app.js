@@ -39,6 +39,22 @@ let myOTDashboardCurrentPage = 1;
 let myOTDashboardSearchTerm = "";
 let otDetailRequestToken = 0;
 
+function invalidateOTDerivedViews() {
+    myOTDashboardRequests = [];
+    calendarMonthCache = new Map();
+    calendarOTData = [];
+    calendarOTByDate = new Map();
+
+    reportSearchToken++;
+    allReportData = [];
+    currentFilteredReportData = [];
+
+    if (document.getElementById("reportsTableBody")) {
+        setReportSummary();
+        setReportTableMessage("ข้อมูล OT มีการเปลี่ยนแปลง กรุณากดปุ่ม “ค้นหา” เพื่อคำนวณรายงานใหม่ค่ะ 🔄");
+    }
+}
+
 const AGENCY_NAME_MAP = {
     'AGC-001': 'Machine', 'AGC-002': 'Sheet Metal', 'AGC-003': 'Bending',
     'AGC-007': 'Laser&Punching', 'AGC-009': 'Welding', 'AGC-010': 'Grinding',
@@ -1108,8 +1124,24 @@ const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
 
         if (editId) {
             // กรณีแก้ไข: อัปเดตข้อมูลเดิมตามปกติ
-            await supabaseClient.from('ot_requests').update(requestPayload).eq('id', editId);
-            await supabaseClient.from('approval_steps').delete().eq('request_id', editId);
+            const { data: updatedRequest, error: updateRequestError } = await supabaseClient
+                .from('ot_requests')
+                .update(requestPayload)
+                .eq('id', editId)
+                .eq('user_id', currentUser.id)
+                .eq('status', 'Pending')
+                .select('id');
+
+            if (updateRequestError) throw updateRequestError;
+            if (!updatedRequest || updatedRequest.length !== 1) {
+                throw new Error('คำขอไม่ถูกแก้ไข: รายการเริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว');
+            }
+
+            const { error: deleteStepsError } = await supabaseClient
+                .from('approval_steps')
+                .delete()
+                .eq('request_id', editId);
+            if (deleteStepsError) throw deleteStepsError;
         } else {
             // ✨ 2. กรณีสร้างใหม่: สั่ง Insert แล้วพ่วงคำสั่ง .select('id').single() เพื่อดึงรหัสใหม่กลับมา
             const { data: newReq, error: insertErr } = await supabaseClient
@@ -1131,7 +1163,10 @@ const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
             { id: reqId + "-STEP3", request_id: reqId, step_order: 3, approver_id: finalSelectedApprovers[2].id, status: 'Pending', assigned_date: todayStr }
         ];
 
-        await supabaseClient.from('approval_steps').insert(stepsData);
+        const { error: insertStepsError } = await supabaseClient.from('approval_steps').insert(stepsData);
+        if (insertStepsError) throw insertStepsError;
+
+        invalidateOTDerivedViews();
 
         Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค่ะ!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
         
@@ -1562,9 +1597,20 @@ async function deleteMyOTRequest(reqId) {
     if (!result.isConfirmed) return;
 
     try {
-        await supabaseClient.from('approval_steps').delete().eq('request_id', reqId);
-        await supabaseClient.from('ot_requests').delete().eq('id', reqId);
-        
+        const { data: deletedRequests, error } = await supabaseClient
+            .from('ot_requests')
+            .delete()
+            .eq('id', reqId)
+            .eq('user_id', currentUser.id)
+            .eq('status', 'Pending')
+            .select('id');
+
+        if (error) throw error;
+        if (!deletedRequests || deletedRequests.length !== 1) {
+            throw new Error('คำขอไม่ถูกลบ: รายการเริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว');
+        }
+
+        invalidateOTDerivedViews();
         Swal.fire('สำเร็จ', '🗑️ ลบรายการสำเร็จแล้วค่ะ!', 'success');
         loadMyOTDashboardData(); 
 
@@ -3822,6 +3868,11 @@ function onSuperAdminOtTypeChange() {
 
 // 1. บันทึกข้อมูลที่แก้ไข
 async function superAdminSaveEditedOT() {
+    if (currentUser?.role !== 'SuperAdmin') {
+        Swal.fire('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะ SuperAdmin เท่านั้นที่สามารถแก้ไขรายการที่ดำเนินการแล้วได้ค่ะ', 'error');
+        return;
+    }
+
     const reqId = document.getElementById('superAdminEditReqId').value;
     const newOtTypeId = document.getElementById('superAdminModalOtType').value;
     const newDate = document.getElementById('superAdminModalDate').value;
@@ -3846,17 +3897,17 @@ async function superAdminSaveEditedOT() {
     if (confirm.isConfirmed) {
         Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            const { error } = await supabaseClient
-                .from('ot_requests')
-                .update({
-                    ot_type_id: newOtTypeId,
-                    date_start: newDate,
-                    description: newDesc
-                })
-                .eq('id', reqId);
+            const { data, error } = await supabaseClient.rpc('oms_superadmin_update_processed_ot', {
+                target_request_id: reqId,
+                target_ot_type_id: newOtTypeId,
+                target_date_start: newDate,
+                target_description: newDesc
+            });
 
             if (error) throw error;
+            if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
 
+            invalidateOTDerivedViews();
             Swal.fire('สำเร็จ', 'แก้ไขข้อมูลคำขอโอทีเรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();
@@ -3869,6 +3920,11 @@ async function superAdminSaveEditedOT() {
 
 // 2. ดึงกลับเป็น Pending
 async function superAdminConfirmResetStatus() {
+    if (currentUser?.role !== 'SuperAdmin') {
+        Swal.fire('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะ SuperAdmin เท่านั้นที่สามารถดึงรายการกลับไป Step 1 ได้ค่ะ', 'error');
+        return;
+    }
+
     const reqId = document.getElementById('superAdminEditReqId').value;
     if (!reqId) return;
 
@@ -3886,13 +3942,15 @@ async function superAdminConfirmResetStatus() {
     if (result.isConfirmed) {
         Swal.fire({ title: 'กำลังดำเนินการ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            const { error: updateReqErr } = await supabaseClient.from('ot_requests').update({ status: 'Pending' }).eq('id', reqId);
-            if (updateReqErr) throw updateReqErr;
-            
-            const { error: updateStepsErr } = await supabaseClient.from('approval_steps').update({ status: 'Pending' }).eq('request_id', reqId);
-            if (updateStepsErr) throw updateStepsErr;
-            
-            Swal.fire('สำเร็จ', 'ดึงกลับสถานะเป็นรออนุมัติเรียบร้อยแล้วค่ะ ✨', 'success');
+            const { data, error } = await supabaseClient.rpc('oms_superadmin_reset_processed_ot', {
+                target_request_id: reqId
+            });
+
+            if (error) throw error;
+            if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
+
+            invalidateOTDerivedViews();
+            Swal.fire('สำเร็จ', 'ดึงกลับเป็น Pending ที่ Step 1 เรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();
         } catch (err) {
@@ -3904,6 +3962,11 @@ async function superAdminConfirmResetStatus() {
 
 // 3. ยกเลิก / ลบรายการ
 async function superAdminConfirmDelete() {
+    if (currentUser?.role !== 'SuperAdmin') {
+        Swal.fire('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะ SuperAdmin เท่านั้นที่สามารถลบรายการที่ดำเนินการแล้วได้ค่ะ', 'error');
+        return;
+    }
+
     const reqId = document.getElementById('superAdminEditReqId').value;
     if (!reqId) return;
 
@@ -3921,11 +3984,19 @@ async function superAdminConfirmDelete() {
     if (result.isConfirmed) {
         Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            await supabaseClient.from('approval_steps').delete().eq('request_id', reqId);
-            const { error } = await supabaseClient.from('ot_requests').delete().eq('id', reqId);
-            
+            const { data: deletedRequests, error } = await supabaseClient
+                .from('ot_requests')
+                .delete()
+                .eq('id', reqId)
+                .in('status', ['Approved', 'Rejected'])
+                .select('id');
+
             if (error) throw error;
-            
+            if (!deletedRequests || deletedRequests.length !== 1) {
+                throw new Error('คำขอไม่ถูกลบ: ไม่พบรายการหรือไม่มีสิทธิ์ลบ');
+            }
+
+            invalidateOTDerivedViews();
             Swal.fire('สำเร็จ', 'ลบรายการโอทีออกจากระบบเรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();
