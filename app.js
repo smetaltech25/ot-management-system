@@ -3337,8 +3337,85 @@ function togglePasswordVisibility() {
 // ===================================================
 let currentApprovalTab = 'pending';
 let superAdminOTTypesCache = [];
+const PROCESSED_APPROVAL_PAGE_SIZE = 50;
+let processedApprovalCurrentPage = 1;
+let processedApprovalTotalCount = 0;
+
+async function fetchProcessedApprovalPage(page = processedApprovalCurrentPage) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const from = (safePage - 1) * PROCESSED_APPROVAL_PAGE_SIZE;
+    const to = from + PROCESSED_APPROVAL_PAGE_SIZE - 1;
+    const { data, error, count } = await supabaseClient
+        .from('ot_requests')
+        .select('id, user_id, ot_type_id, date_start, description, status, submit_date', { count: 'exact' })
+        .in('status', ['Approved', 'Rejected'])
+        .order('submit_date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to);
+
+    if (error) throw error;
+
+    return {
+        requests: data || [],
+        totalCount: count || 0,
+        page: safePage
+    };
+}
+
+function setProcessedApprovalPaginationLoading(isLoading) {
+    const prevBtn = document.getElementById('processedApprovalPrevBtn');
+    const nextBtn = document.getElementById('processedApprovalNextBtn');
+    if (prevBtn) prevBtn.disabled = isLoading;
+    if (nextBtn) nextBtn.disabled = isLoading;
+}
+
+function renderProcessedApprovalPagination() {
+    const pagination = document.getElementById('processedApprovalPagination');
+    const rangeText = document.getElementById('processedApprovalRange');
+    const pageInfo = document.getElementById('processedApprovalPageInfo');
+    const prevBtn = document.getElementById('processedApprovalPrevBtn');
+    const nextBtn = document.getElementById('processedApprovalNextBtn');
+    if (!pagination || !rangeText || !pageInfo || !prevBtn || !nextBtn) return;
+
+    if (currentApprovalTab !== 'processed') {
+        pagination.classList.add('hidden');
+        return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(processedApprovalTotalCount / PROCESSED_APPROVAL_PAGE_SIZE));
+    const start = processedApprovalTotalCount === 0
+        ? 0
+        : ((processedApprovalCurrentPage - 1) * PROCESSED_APPROVAL_PAGE_SIZE) + 1;
+    const end = Math.min(processedApprovalCurrentPage * PROCESSED_APPROVAL_PAGE_SIZE, processedApprovalTotalCount);
+
+    rangeText.innerText = `${start}–${end} จากทั้งหมด ${processedApprovalTotalCount} รายการ`;
+    pageInfo.innerText = `หน้า ${processedApprovalCurrentPage} / ${totalPages}`;
+    prevBtn.disabled = processedApprovalCurrentPage <= 1;
+    nextBtn.disabled = processedApprovalCurrentPage >= totalPages || processedApprovalTotalCount === 0;
+    pagination.classList.remove('hidden');
+}
+
+async function changeProcessedApprovalPage(offset) {
+    const totalPages = Math.max(1, Math.ceil(processedApprovalTotalCount / PROCESSED_APPROVAL_PAGE_SIZE));
+    const targetPage = processedApprovalCurrentPage + Number(offset);
+    if (targetPage < 1 || targetPage > totalPages || targetPage === processedApprovalCurrentPage) return;
+
+    processedApprovalCurrentPage = targetPage;
+    await loadProcessedApprovalData();
+
+    const resultsHeading = document.getElementById('page2Title');
+    if (currentApprovalTab === 'processed' && resultsHeading) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        resultsHeading.focus({ preventScroll: true });
+        resultsHeading.scrollIntoView({
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            block: 'start'
+        });
+    }
+}
 
 function switchApprovalTab(tab) {
+    const previousTab = currentApprovalTab;
     currentApprovalTab = tab;
     const btnPending = document.getElementById('tabPending');
     const btnProcessed = document.getElementById('tabProcessed');
@@ -3357,7 +3434,9 @@ function switchApprovalTab(tab) {
         if (bulkApproveBtn) bulkApproveBtn.style.display = "";
         if (bulkRejectBtn) bulkRejectBtn.style.display = "";
         if (selectAllCheckbox) selectAllCheckbox.disabled = false;
+        renderProcessedApprovalPagination();
     } else {
+        if (previousTab !== 'processed') processedApprovalCurrentPage = 1;
         btnProcessed.className = "px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
         btnPending.className = "px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
         
@@ -3387,19 +3466,28 @@ async function loadProcessedApprovalData() {
     if (!tbody) return;
 
     tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการที่ดำเนินการแล้ว...</td></tr>';
+    setProcessedApprovalPaginationLoading(true);
 
     try {
-        const { data: processedRequests, error: reqErr } = await supabaseClient
-            .from('ot_requests')
-            .select('id, user_id, ot_type_id, date_start, description, status, submit_date')
-            .in('status', ['Approved', 'Rejected'])
-            .order('submit_date', { ascending: false })
-            .limit(100);
+        let pageResult = null;
+        while (!pageResult) {
+            try {
+                pageResult = await fetchProcessedApprovalPage();
+            } catch (pageError) {
+                if (pageError?.code === 'PGRST103' && processedApprovalCurrentPage > 1) {
+                    processedApprovalCurrentPage -= 1;
+                    continue;
+                }
+                throw pageError;
+            }
+        }
 
-        if (reqErr) throw reqErr;
+        processedApprovalTotalCount = pageResult.totalCount;
+        const processedRequests = pageResult.requests;
 
         if (!processedRequests || processedRequests.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400">ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨</td></tr>';
+            renderProcessedApprovalPagination();
             return;
         }
 
@@ -3484,10 +3572,15 @@ async function loadProcessedApprovalData() {
         });
 
         tbody.replaceChildren(fragment);
+        renderProcessedApprovalPagination();
 
     } catch (err) {
         console.error("Load Processed Approvals Error:", err);
         tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-rose-500">เกิดข้อผิดพลาดในการโหลดข้อมูลค่ะ</td></tr>';
+        renderProcessedApprovalPagination();
+    } finally {
+        setProcessedApprovalPaginationLoading(false);
+        renderProcessedApprovalPagination();
     }
 }
 
