@@ -592,17 +592,127 @@ function changeMyOTDashboardPage(action) {
 // ----------------===================================
 // 4. ระบบคิวงานพิจารณาอนุมัติแบบขั้นบันไดลำดับ 1->2->3 (Page 2)
 // ----------------===================================
+let approvalSearchTerm = '';
+let approvalSearchDisplayTerm = '';
+let approvalSearchLoadToken = 0;
+let processedApprovalSearchCache = null;
+
+function normalizeApprovalSearchValue(value) {
+    return String(value ?? '')
+        .normalize('NFC')
+        .trim()
+        .toLocaleLowerCase('th-TH');
+}
+
+function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSearchTerm) {
+    if (!normalizedTerm) return true;
+
+    const searchableValues = [
+        request?.id,
+        user?.fullname,
+        user?.agency,
+        AGENCY_NAME_MAP[user?.agency],
+        user?.department,
+        DEPARTMENT_NAME_MAP[user?.department],
+        getUserOrganizationLabel(user)
+    ];
+
+    return searchableValues.some(value =>
+        normalizeApprovalSearchValue(value).includes(normalizedTerm)
+    );
+}
+
+function setApprovalSearchFeedback(matchCount, totalCount) {
+    const feedback = document.getElementById('approvalSearchFeedback');
+    if (!feedback) return;
+
+    if (!approvalSearchTerm) {
+        feedback.textContent = '';
+        feedback.classList.add('hidden');
+        return;
+    }
+
+    feedback.textContent = `พบ ${matchCount} จาก ${totalCount} รายการ สำหรับ “${approvalSearchDisplayTerm}”`;
+    feedback.classList.remove('hidden');
+}
+
+function setApprovalTableMessage(tbody, message, textClass = 'text-slate-400') {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 9;
+    cell.className = `p-4 text-center ${textClass}`;
+    cell.textContent = message;
+    row.appendChild(cell);
+    tbody.replaceChildren(row);
+}
+
+function handleApprovalSearchInput() {
+    const input = document.getElementById('approvalSearchInput');
+    const clearBtn = document.getElementById('approvalSearchClearBtn');
+    if (!input || !clearBtn) return;
+
+    const hasValue = input.value.trim().length > 0;
+    clearBtn.classList.toggle('hidden', !hasValue);
+    clearBtn.classList.toggle('flex', hasValue);
+}
+
+function invalidateProcessedApprovalSearchCache() {
+    processedApprovalSearchCache = null;
+}
+
+function submitApprovalSearch(event) {
+    if (event) event.preventDefault();
+
+    const input = document.getElementById('approvalSearchInput');
+    approvalSearchDisplayTerm = input?.value.trim() || '';
+    approvalSearchTerm = normalizeApprovalSearchValue(approvalSearchDisplayTerm);
+    processedApprovalCurrentPage = 1;
+    handleApprovalSearchInput();
+    loadCurrentApprovalTab();
+}
+
+function clearApprovalSearch() {
+    const input = document.getElementById('approvalSearchInput');
+    if (input) input.value = '';
+
+    approvalSearchDisplayTerm = '';
+    approvalSearchTerm = '';
+    processedApprovalCurrentPage = 1;
+    handleApprovalSearchInput();
+    setApprovalSearchFeedback(0, 0);
+    loadCurrentApprovalTab();
+    input?.focus();
+}
+
+function reloadCurrentApprovalTab() {
+    invalidateProcessedApprovalSearchCache();
+    loadCurrentApprovalTab();
+}
+
 async function loadApprovalQueueData() {
     if (!currentUser) return;
 
     const tbody = document.getElementById("approvalQueueTableBody");
     if (!tbody) return;
 
+    const loadToken = ++approvalSearchLoadToken;
+    const searchTermSnapshot = approvalSearchTerm;
+    const isStaleLoad = () => (
+        loadToken !== approvalSearchLoadToken
+        || currentApprovalTab !== 'pending'
+        || searchTermSnapshot !== approvalSearchTerm
+    );
+
     const selectAllCheckbox = document.getElementById("selectAllCheckbox");
     if (selectAllCheckbox) selectAllCheckbox.checked = false;
 
-    const showEmptyState = () => {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400">ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨</td></tr>`;
+    const showEmptyState = (totalCount = 0) => {
+        if (isStaleLoad()) return;
+        const message = searchTermSnapshot
+            ? `ไม่พบรายการรออนุมัติที่ตรงกับ “${approvalSearchDisplayTerm}” ค่ะ`
+            : 'ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨';
+        setApprovalTableMessage(tbody, message);
+        setApprovalSearchFeedback(0, totalCount);
     };
 
     tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการรออนุมัติ...</td></tr>`;
@@ -672,7 +782,7 @@ async function loadApprovalQueueData() {
             userIds.length > 0
                 ? supabaseClient
                     .from('users')
-                    .select('id, fullname, avatar_url, role, department')
+                    .select('id, fullname, avatar_url, role, department, agency')
                     .in('id', userIds)
                 : emptyResult,
             otTypeIds.length > 0
@@ -688,9 +798,23 @@ async function loadApprovalQueueData() {
 
         const userMap = new Map((usersResult.data || []).map(user => [user.id, user]));
         const otTypeMap = new Map((otTypesResult.data || []).map(otType => [otType.id, otType]));
+        const filteredEligibleSteps = eligibleSteps.filter(step => {
+            const request = requestMap.get(step.request_id);
+            if (!request) return false;
+            return doesApprovalItemMatchSearch(request, userMap.get(request.user_id), searchTermSnapshot);
+        });
+
+        if (isStaleLoad()) return;
+        setApprovalSearchFeedback(filteredEligibleSteps.length, eligibleSteps.length);
+
+        if (filteredEligibleSteps.length === 0) {
+            showEmptyState(eligibleSteps.length);
+            return;
+        }
+
         const fragment = document.createDocumentFragment();
 
-        eligibleSteps.forEach(step => {
+        filteredEligibleSteps.forEach(step => {
             const request = requestMap.get(step.request_id);
             if (!request) return;
 
@@ -752,12 +876,14 @@ async function loadApprovalQueueData() {
             fragment.appendChild(tr);
         });
 
+        if (isStaleLoad()) return;
         tbody.innerHTML = "";
         tbody.appendChild(fragment);
 
         if (!tbody.querySelector('tr')) showEmptyState();
     } catch (err) {
         console.error("Load Approval Queue Error:", err);
+        if (isStaleLoad()) return;
         tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-red-500">โหลดรายการรออนุมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</td></tr>`;
     }
 }
@@ -3519,6 +3645,8 @@ function togglePasswordVisibility() {
 let currentApprovalTab = 'pending';
 let superAdminOTTypesCache = [];
 const PROCESSED_APPROVAL_PAGE_SIZE = 50;
+const PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE = 1000;
+const APPROVAL_USER_QUERY_BATCH_SIZE = 150;
 let processedApprovalCurrentPage = 1;
 let processedApprovalTotalCount = 0;
 
@@ -3540,6 +3668,92 @@ async function fetchProcessedApprovalPage(page = processedApprovalCurrentPage) {
         requests: data || [],
         totalCount: count || 0,
         page: safePage
+    };
+}
+
+async function fetchAllProcessedApprovalRequests() {
+    const requests = [];
+    let from = 0;
+
+    while (true) {
+        const to = from + PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE - 1;
+        const { data, error } = await supabaseClient
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, description, status, submit_date')
+            .in('status', ['Approved', 'Rejected'])
+            .order('submit_date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(from, to);
+
+        if (error) throw error;
+
+        const chunk = data || [];
+        requests.push(...chunk);
+        if (chunk.length < PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE) break;
+        from += PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE;
+    }
+
+    return requests;
+}
+
+async function fetchApprovalUsersByIds(userIds) {
+    if (!userIds.length) return [];
+
+    const batches = [];
+    for (let index = 0; index < userIds.length; index += APPROVAL_USER_QUERY_BATCH_SIZE) {
+        const batchIds = userIds.slice(index, index + APPROVAL_USER_QUERY_BATCH_SIZE);
+        batches.push(
+            supabaseClient
+                .from('users')
+                .select('id, fullname, avatar_url, role, department, agency')
+                .in('id', batchIds)
+        );
+    }
+
+    const results = await Promise.all(batches);
+    const users = [];
+    results.forEach(result => {
+        if (result.error) throw result.error;
+        users.push(...(result.data || []));
+    });
+    return users;
+}
+
+async function buildProcessedApprovalSearchCache(normalizedTerm) {
+    let allRequests = processedApprovalSearchCache?.allRequests || null;
+    let userMap = processedApprovalSearchCache?.userMap || null;
+    let otTypeMap = processedApprovalSearchCache?.otTypeMap || null;
+    let otTypes = processedApprovalSearchCache?.otTypes || null;
+
+    if (!allRequests || !userMap || !otTypeMap || !otTypes) {
+        const [loadedRequests, otTypesResult] = await Promise.all([
+            fetchAllProcessedApprovalRequests(),
+            supabaseClient.from('ot_types').select('id, rate, start_time, end_time')
+        ]);
+
+        if (otTypesResult.error) throw otTypesResult.error;
+
+        allRequests = loadedRequests;
+        const userIds = [...new Set(allRequests.map(request => request.user_id).filter(Boolean))];
+        const users = await fetchApprovalUsersByIds(userIds);
+        userMap = new Map(users.map(user => [user.id, user]));
+        otTypes = otTypesResult.data || [];
+        otTypeMap = new Map(otTypes.map(otType => [otType.id, otType]));
+    }
+
+    const matchingRequests = allRequests.filter(request =>
+        doesApprovalItemMatchSearch(request, userMap.get(request.user_id), normalizedTerm)
+    );
+
+    superAdminOTTypesCache = otTypes;
+    return {
+        term: normalizedTerm,
+        requests: matchingRequests,
+        totalUnfilteredCount: allRequests.length,
+        allRequests,
+        userMap,
+        otTypeMap,
+        otTypes
     };
 }
 
@@ -3646,43 +3860,81 @@ async function loadProcessedApprovalData() {
     const tbody = document.getElementById("approvalQueueTableBody");
     if (!tbody) return;
 
+    const loadToken = ++approvalSearchLoadToken;
+    const searchTermSnapshot = approvalSearchTerm;
+    const isStaleLoad = () => (
+        loadToken !== approvalSearchLoadToken
+        || currentApprovalTab !== 'processed'
+        || searchTermSnapshot !== approvalSearchTerm
+    );
+
     tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการที่ดำเนินการแล้ว...</td></tr>';
     setProcessedApprovalPaginationLoading(true);
 
     try {
-        let pageResult = null;
-        while (!pageResult) {
-            try {
-                pageResult = await fetchProcessedApprovalPage();
-            } catch (pageError) {
-                if (pageError?.code === 'PGRST103' && processedApprovalCurrentPage > 1) {
-                    processedApprovalCurrentPage -= 1;
-                    continue;
-                }
-                throw pageError;
+        let processedRequests = [];
+        let totalUnfilteredCount = 0;
+        let userMap = new Map();
+        let otTypeMap = new Map();
+
+        if (searchTermSnapshot) {
+            if (!processedApprovalSearchCache || processedApprovalSearchCache.term !== searchTermSnapshot) {
+                const newCache = await buildProcessedApprovalSearchCache(searchTermSnapshot);
+                if (isStaleLoad()) return;
+                processedApprovalSearchCache = newCache;
             }
+
+            const searchCache = processedApprovalSearchCache;
+            processedApprovalTotalCount = searchCache.requests.length;
+            totalUnfilteredCount = searchCache.totalUnfilteredCount;
+            const totalPages = Math.max(1, Math.ceil(processedApprovalTotalCount / PROCESSED_APPROVAL_PAGE_SIZE));
+            processedApprovalCurrentPage = Math.min(processedApprovalCurrentPage, totalPages);
+            const from = (processedApprovalCurrentPage - 1) * PROCESSED_APPROVAL_PAGE_SIZE;
+            processedRequests = searchCache.requests.slice(from, from + PROCESSED_APPROVAL_PAGE_SIZE);
+            userMap = searchCache.userMap;
+            otTypeMap = searchCache.otTypeMap;
+        } else {
+            let pageResult = null;
+            while (!pageResult) {
+                try {
+                    pageResult = await fetchProcessedApprovalPage();
+                } catch (pageError) {
+                    if (pageError?.code === 'PGRST103' && processedApprovalCurrentPage > 1) {
+                        processedApprovalCurrentPage -= 1;
+                        continue;
+                    }
+                    throw pageError;
+                }
+            }
+
+            if (isStaleLoad()) return;
+            processedApprovalTotalCount = pageResult.totalCount;
+            totalUnfilteredCount = pageResult.totalCount;
+            processedRequests = pageResult.requests;
+
+            const userIds = [...new Set(processedRequests.map(request => request.user_id).filter(Boolean))];
+            const [users, otTypesRes] = await Promise.all([
+                fetchApprovalUsersByIds(userIds),
+                supabaseClient.from('ot_types').select('id, rate, start_time, end_time')
+            ]);
+
+            if (otTypesRes.error) throw otTypesRes.error;
+            superAdminOTTypesCache = otTypesRes.data || [];
+            userMap = new Map(users.map(user => [user.id, user]));
+            otTypeMap = new Map(superAdminOTTypesCache.map(otType => [otType.id, otType]));
         }
 
-        processedApprovalTotalCount = pageResult.totalCount;
-        const processedRequests = pageResult.requests;
+        if (isStaleLoad()) return;
+        setApprovalSearchFeedback(processedApprovalTotalCount, totalUnfilteredCount);
 
         if (!processedRequests || processedRequests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400">ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨</td></tr>';
+            const emptyMessage = searchTermSnapshot
+                ? `ไม่พบรายการที่ดำเนินการแล้วซึ่งตรงกับ “${approvalSearchDisplayTerm}” ค่ะ`
+                : 'ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨';
+            setApprovalTableMessage(tbody, emptyMessage);
             renderProcessedApprovalPagination();
             return;
         }
-
-        const userIds = [...new Set(processedRequests.map(r => r.user_id).filter(Boolean))];
-        const otTypeIds = [...new Set(processedRequests.map(r => r.ot_type_id).filter(Boolean))];
-
-        const [usersRes, otTypesRes] = await Promise.all([
-            userIds.length > 0 ? supabaseClient.from('users').select('id, fullname, avatar_url, role, department, agency').in('id', userIds) : Promise.resolve({ data: [] }),
-            supabaseClient.from('ot_types').select('id, rate, start_time, end_time')
-        ]);
-
-        superAdminOTTypesCache = otTypesRes.data || [];
-        const userMap = new Map((usersRes.data || []).map(u => [u.id, u]));
-        const otTypeMap = new Map((superAdminOTTypesCache).map(ot => [ot.id, ot]));
 
         const fragment = document.createDocumentFragment();
 
@@ -3752,16 +4004,20 @@ async function loadProcessedApprovalData() {
             fragment.appendChild(tr);
         });
 
+        if (isStaleLoad()) return;
         tbody.replaceChildren(fragment);
         renderProcessedApprovalPagination();
 
     } catch (err) {
         console.error("Load Processed Approvals Error:", err);
+        if (isStaleLoad()) return;
         tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-rose-500">เกิดข้อผิดพลาดในการโหลดข้อมูลค่ะ</td></tr>';
         renderProcessedApprovalPagination();
     } finally {
-        setProcessedApprovalPaginationLoading(false);
-        renderProcessedApprovalPagination();
+        if (!isStaleLoad()) {
+            setProcessedApprovalPaginationLoading(false);
+            renderProcessedApprovalPagination();
+        }
     }
 }
 
@@ -3908,6 +4164,7 @@ async function superAdminSaveEditedOT() {
             if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
 
             invalidateOTDerivedViews();
+            invalidateProcessedApprovalSearchCache();
             Swal.fire('สำเร็จ', 'แก้ไขข้อมูลคำขอโอทีเรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();
@@ -3950,6 +4207,7 @@ async function superAdminConfirmResetStatus() {
             if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
 
             invalidateOTDerivedViews();
+            invalidateProcessedApprovalSearchCache();
             Swal.fire('สำเร็จ', 'ดึงกลับเป็น Pending ที่ Step 1 เรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();
@@ -3997,6 +4255,7 @@ async function superAdminConfirmDelete() {
             }
 
             invalidateOTDerivedViews();
+            invalidateProcessedApprovalSearchCache();
             Swal.fire('สำเร็จ', 'ลบรายการโอทีออกจากระบบเรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
             loadProcessedApprovalData();

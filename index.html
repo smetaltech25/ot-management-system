@@ -613,7 +613,7 @@
     <h3 class="font-bold text-slate-800 text-lg w-full sm:w-auto scroll-mt-24 focus:outline-none" id="page2Title" tabindex="-1">รายการรออนุมัติ OT</h3>
     
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-start sm:justify-end" id="approvalActionButtons">
-        <button onclick="loadCurrentApprovalTab()" class="p-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
+        <button onclick="reloadCurrentApprovalTab()" class="p-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
             <i class='bx bx-refresh text-xl sm:mr-1.5'></i> รีโหลด
         </button>
         <button id="bulkApproveBtn" onclick="bulkApproveSteps('Approved')" class="p-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
@@ -628,6 +628,36 @@
             <button id="tabProcessed" onclick="switchApprovalTab('processed')" class="px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap">ดำเนินการแล้ว</button>
         </div>
     </div>
+</div>
+
+<div class="mb-5">
+    <form id="approvalSearchForm" role="search" onsubmit="submitApprovalSearch(event)" class="flex flex-col sm:flex-row gap-2.5 w-full max-w-3xl">
+        <label for="approvalSearchInput" class="sr-only">ค้นหารายการขออนุมัติโอที</label>
+        <div class="relative flex-1 min-w-0">
+            <i class="bx bx-search absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-slate-400 pointer-events-none" aria-hidden="true"></i>
+            <input
+                type="text"
+                inputmode="search"
+                id="approvalSearchInput"
+                name="approval_search"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                oninput="handleApprovalSearchInput()"
+                placeholder="ค้นหาชื่อ–นามสกุล รหัสคำขอ หน่วยงาน หรือฝ่าย"
+                aria-describedby="approvalSearchFeedback"
+                class="w-full h-11 pl-11 pr-11 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all"
+            >
+            <button id="approvalSearchClearBtn" type="button" onclick="clearApprovalSearch()" aria-label="ล้างคำค้นหา" title="ล้างคำค้นหา" class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/70 dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <i class="bx bx-x text-xl" aria-hidden="true"></i>
+            </button>
+        </div>
+        <button id="approvalSearchBtn" type="submit" class="h-11 px-5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-sm inline-flex items-center justify-center gap-2 sm:min-w-[112px]">
+            <i class="bx bx-search text-lg" aria-hidden="true"></i>
+            <span>ค้นหา</span>
+        </button>
+    </form>
+    <p id="approvalSearchFeedback" aria-live="polite" class="hidden mt-2 text-xs font-medium text-slate-500 dark:text-slate-400"></p>
 </div>
 
 <div class="overflow-x-auto rounded-xl border border-slate-100">
@@ -1589,6 +1619,6 @@
 </div>
 
 <script src="config.js?v=20260824-5"></script>
-<script src="app.js?v=20260824-7"></script>
+<script src="app.js?v=20260831-1"></script>
 </body>
 </html>
