@@ -596,6 +596,8 @@ let approvalSearchTerm = '';
 let approvalSearchDisplayTerm = '';
 let approvalSearchLoadToken = 0;
 let processedApprovalSearchCache = null;
+let approvalSearchDebounceTimer = null;
+const APPROVAL_LIVE_SEARCH_DELAY_MS = 300;
 
 function normalizeApprovalSearchValue(value) {
     return String(value ?? '')
@@ -617,9 +619,12 @@ function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSea
         getUserOrganizationLabel(user)
     ];
 
-    return searchableValues.some(value =>
-        normalizeApprovalSearchValue(value).includes(normalizedTerm)
-    );
+    const searchableText = searchableValues
+        .map(normalizeApprovalSearchValue)
+        .join(' ');
+    const searchTokens = normalizedTerm.split(/\s+/).filter(Boolean);
+
+    return searchTokens.every(token => searchableText.includes(token));
 }
 
 function setApprovalSearchFeedback(matchCount, totalCount) {
@@ -646,7 +651,7 @@ function setApprovalTableMessage(tbody, message, textClass = 'text-slate-400') {
     tbody.replaceChildren(row);
 }
 
-function handleApprovalSearchInput() {
+function syncApprovalSearchClearButton() {
     const input = document.getElementById('approvalSearchInput');
     const clearBtn = document.getElementById('approvalSearchClearBtn');
     if (!input || !clearBtn) return;
@@ -656,29 +661,51 @@ function handleApprovalSearchInput() {
     clearBtn.classList.toggle('flex', hasValue);
 }
 
+function applyApprovalSearchFromInput(forceReload = false) {
+    const input = document.getElementById('approvalSearchInput');
+    const nextDisplayTerm = input?.value.trim() || '';
+    const nextSearchTerm = normalizeApprovalSearchValue(nextDisplayTerm);
+
+    if (!forceReload && nextSearchTerm === approvalSearchTerm) return;
+
+    approvalSearchDisplayTerm = nextDisplayTerm;
+    approvalSearchTerm = nextSearchTerm;
+    processedApprovalCurrentPage = 1;
+    loadCurrentApprovalTab();
+}
+
+function handleApprovalSearchInput() {
+    syncApprovalSearchClearButton();
+    window.clearTimeout(approvalSearchDebounceTimer);
+    approvalSearchDebounceTimer = window.setTimeout(() => {
+        approvalSearchDebounceTimer = null;
+        applyApprovalSearchFromInput();
+    }, APPROVAL_LIVE_SEARCH_DELAY_MS);
+}
+
 function invalidateProcessedApprovalSearchCache() {
     processedApprovalSearchCache = null;
 }
 
 function submitApprovalSearch(event) {
     if (event) event.preventDefault();
-
-    const input = document.getElementById('approvalSearchInput');
-    approvalSearchDisplayTerm = input?.value.trim() || '';
-    approvalSearchTerm = normalizeApprovalSearchValue(approvalSearchDisplayTerm);
-    processedApprovalCurrentPage = 1;
-    handleApprovalSearchInput();
-    loadCurrentApprovalTab();
+    window.clearTimeout(approvalSearchDebounceTimer);
+    approvalSearchDebounceTimer = null;
+    syncApprovalSearchClearButton();
+    applyApprovalSearchFromInput(true);
 }
 
 function clearApprovalSearch() {
     const input = document.getElementById('approvalSearchInput');
     if (input) input.value = '';
 
+    window.clearTimeout(approvalSearchDebounceTimer);
+    approvalSearchDebounceTimer = null;
+
     approvalSearchDisplayTerm = '';
     approvalSearchTerm = '';
     processedApprovalCurrentPage = 1;
-    handleApprovalSearchInput();
+    syncApprovalSearchClearButton();
     setApprovalSearchFeedback(0, 0);
     loadCurrentApprovalTab();
     input?.focus();
