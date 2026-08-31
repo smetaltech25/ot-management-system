@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 24 สิงหาคม 2026
+**อัปเดตล่าสุด:** 31 สิงหาคม 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) และจ๊ะ (Codex) สำหรับพี่ต้น 💖
 
@@ -13,8 +13,44 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Script Cache Version:** `v=20260824-5` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260831-2` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 อัปเดตโดยจ๊ะ: ระบบค้นหาหน้าอนุมัติ Deploy วันที่ 31/08/2026
+
+### A. ขอบเขตและพฤติกรรมการค้นหา
+
+* เพิ่มช่องค้นหา ปุ่ม `ค้นหา` และปุ่มล้างคำค้นในหน้า **รายการขออนุญาต OT (Page 2)**
+* ใช้ได้ทั้งแท็บ **รออนุมัติ** และ **ดำเนินการแล้ว (SuperAdmin)**
+* ค้นหาจากชื่อ–นามสกุล, รหัสคำขอ OT, รหัส/ชื่อหน่วยงาน และรหัส/ชื่อฝ่าย
+* รองรับการกดปุ่ม `ค้นหา`, กด `Enter` และ Live Search ตั้งแต่ตัวอักษรแรก
+* Live Search ใช้ Debounce `300 ms` หลังหยุดพิมพ์ เพื่อลด Query ซ้ำระหว่างพิมพ์
+* รองรับคำค้นหลาย Token เช่น `S M` โดยแต่ละ Token สามารถตรงกับข้อมูลคนละส่วนของข้อความค้นหาได้
+* เมื่อคำค้นเปลี่ยน ระบบกลับไปหน้า 1; เมื่อกดปุ่มล้าง ระบบคืนรายการทั้งหมดและ Focus กลับช่องค้นหา
+* แสดงจำนวนรายการที่พบเทียบกับจำนวนทั้งหมดผ่าน `aria-live` และรองรับการใช้งานบน Mobile โดยช่องค้นหา/ปุ่มจัดเรียงตามความกว้างหน้าจอ
+
+### B. การรองรับข้อมูลจำนวนมากและ Pagination
+
+* โหมดปกติของแท็บดำเนินการแล้วยังคงใช้ Server-side pagination หน้าละ `50` รายการ ไม่เปลี่ยน Data flow เดิม
+* เมื่อมีคำค้น ระบบดึงรายการ Approved/Rejected ทุกชุดจาก Supabase ด้วย `.range()` ชุดละ `1,000` รายการ แล้วค้นหาจากข้อมูลครบทุกหน้า ไม่ได้ค้นเฉพาะ 50 รายการที่กำลังแสดง
+* ผลค้นหายังคงแบ่งหน้าละ `50` รายการ
+* Cache ชุดข้อมูลค้นหาของแท็บดำเนินการแล้วไว้ระหว่างเปลี่ยนหน้าและเปลี่ยนคำค้น เพื่อลดการโหลดข้อมูลทั้งหมดซ้ำ
+* ปุ่ม `รีโหลด` และการแก้ไข/ดึงกลับ/ลบรายการโดย SuperAdmin จะล้าง Cache ก่อนโหลดข้อมูลล่าสุด
+* การเปลี่ยนครั้งนี้ไม่แก้ Database schema, RLS, Authentication, Approval workflow หรือสิทธิ์ของ Role ใด
+
+### C. ไฟล์, Commit และผลตรวจ
+
+* ไฟล์ที่แก้: `index.html`, `app.js`
+* Commit `9eb1e3a` — `Add approval request search`
+* Commit `bcc7c36` — `Enable live approval search`
+* GitHub Pages ของทั้งสอง Commit Build และ Deploy สำเร็จ; Production ตรวจพบ `app.js?v=20260831-2`
+* ตรวจ JavaScript syntax และ `git diff --check` ผ่าน
+* ทดสอบ Field matching เดิม `8/8`, Live Search/Debounce `2/2` และ Single-character/Multi-token matching `6/6`
+* ทดสอบจำลองรายการดำเนินการแล้ว `2,070` รายการ: โหลดครบ `2,070/2,070` ผ่านช่วง `0–999`, `1000–1999`, `2000–2999`
+* Localhost โหลด Asset เวอร์ชันใหม่และไม่พบ JavaScript Console Error
+* พี่ต้นทดสอบบนระบบจริงและยืนยันว่าระบบทำงานได้ดีแล้ว
 
 ---
 
