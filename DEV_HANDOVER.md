@@ -13,8 +13,37 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260901-2` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260901-3` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 อัปเดตโดยจ๊ะ: Badge จำนวนรายการรออนุมัติ Deploy วันที่ 01/09/2026
+
+### A. ขอบเขตและกติกาการนับ
+
+* เพิ่ม Badge ตัวเลขสีแดงท้ายเมนู `การขออนุญาต` เพื่อให้ผู้อนุมัติเห็นจำนวนงานค้างจาก Sidebar ทันที
+* นับเฉพาะ `approval_steps` สถานะ `Pending` ที่กำหนดให้ผู้ใช้งานปัจจุบัน และ Step ก่อนหน้าของคำขอนั้นต้องเป็น `Approved` ครบแล้ว จึงเป็นจำนวนรายการที่สามารถอนุมัติได้จริงในขณะนั้น
+* Role `User` ไม่แสดงเมนูอนุมัติตามสิทธิ์เดิมและไม่ Query จำนวน Badge
+* จำนวน `0` จะซ่อน Badge, `1–99` แสดงตามจริง และมากกว่า `99` แสดง `99+` โดย Accessibility label ยังระบุจำนวนจริง
+* Badge รองรับ Sidebar แบบย่อ/ขยาย, Mobile, Light Mode และ Dark Mode
+
+### B. จุดที่รีเฟรชและผลกระทบ
+
+* รีเฟรชจำนวนหลัง Login, เมื่อเปิดหรือรีโหลดหน้าการอนุมัติ, หลังอนุมัติ/ไม่อนุมัติ และหลัง SuperAdmin ดึงรายการกลับเป็น Pending
+* เมื่อ Logout ระบบยกเลิกผล Query เก่าและซ่อน Badge เพื่อป้องกันจำนวนของผู้ใช้ก่อนหน้าแสดงค้าง
+* ใช้ Load token ตรวจ User/Request ล่าสุด ป้องกันผล Query เก่ากลับมาทับหลังเปลี่ยน Session
+* ใช้กติกาการหา Eligible step ร่วมกับตารางรออนุมัติ จึงไม่เกิดความต่างระหว่างจำนวนบน Badge กับรายการที่ผู้ใช้ดำเนินการได้
+* การเปลี่ยนครั้งนี้ไม่แก้ Database schema, RLS, Authentication, Approval workflow หรือสิทธิ์ของ Role ใด
+
+### C. ไฟล์, Commit และผลตรวจ
+
+* ไฟล์ที่แก้: `index.html`, `app.js`
+* Commit `3707acd` — `Add pending approval menu badge`
+* ตรวจ `node --check app.js`, `git diff --check` และ JavaScript Console ผ่าน
+* Logic test ผ่าน `5/5`: Step 1, Step 2 ที่ยังรอ Step ก่อนหน้า, Step 2 ที่พร้อมอนุมัติ, ค่า `0` และค่าเกิน `99`
+* GitHub Pages Run `33490763127` Build/Deploy สำเร็จ และ Production ตรวจพบ `app.js?v=20260901-3`
+* พี่ต้นตรวจ Production ด้วยบัญชีจริงและยืนยัน Badge แสดง `57` รายการถูกต้องแล้ว
 
 ---
 
