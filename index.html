@@ -267,6 +267,18 @@
       box-shadow: none !important;
     }
     html.dark .management-btn-rose:hover { background-color: rgba(244, 63, 94, 0.28) !important; }
+    html.dark .management-btn-teal {
+      background-color: rgba(20, 184, 166, 0.16) !important;
+      border-color: rgba(45, 212, 191, 0.34) !important;
+      color: #5eead4 !important;
+      box-shadow: none !important;
+    }
+    html.dark .management-btn-teal:hover { background-color: rgba(20, 184, 166, 0.28) !important; }
+    html.dark .management-modal-header-teal {
+      background-color: rgba(20, 184, 166, 0.12) !important;
+      border-color: rgba(45, 212, 191, 0.24) !important;
+    }
+    html.dark .management-modal-title-teal { color: #5eead4 !important; }
     html.dark .management-modal-header-rose {
       background-color: rgba(244, 63, 94, 0.12) !important;
       border-color: rgba(251, 113, 133, 0.24) !important;
@@ -922,7 +934,7 @@
                     <input type="text" id="searchDeptInput" onkeyup="searchTable('searchDeptInput', 'deptsTableBody')" placeholder="ค้นหารหัส หรือ ชื่อฝ่าย..." class="w-full sm:w-64 p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500 transition-colors">
                     <i class='bx bx-search absolute left-3.5 top-3 text-slate-400 text-lg'></i>
                 </div>
-                <button onclick="openDeptModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 transition-colors shadow-md flex items-center whitespace-nowrap">
+                <button onclick="openDeptModal()" class="dashboard-action-btn management-btn-teal px-4 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 transition-colors shadow-md flex items-center whitespace-nowrap">
                     <i class='bx bx-plus text-lg mr-1'></i> เพิ่มฝ่าย
                 </button>
             </div>
@@ -1471,13 +1483,13 @@
         </div>
     </div>
 </div>
-<div id="deptFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
-        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-teal-50">
-            <h3 class="font-bold text-lg text-teal-800" id="deptModalTitle"><i class='bx bxs-group mr-2'></i>เพิ่มฝ่ายใหม่</h3>
-            <button onclick="closeDeptModal()" class="text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
+<div id="deptFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] hidden flex items-start sm:items-center justify-center p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in flex flex-col min-h-0 max-h-[calc(100svh-2rem)]">
+        <div class="management-modal-header-teal p-5 border-b border-slate-100 flex justify-between items-center bg-teal-50 shrink-0">
+            <h3 class="management-modal-title-teal font-bold text-lg text-teal-800" id="deptModalTitle"><i class='bx bxs-group mr-2'></i>เพิ่มฝ่ายใหม่</h3>
+            <button onclick="closeDeptModal()" class="modal-close-btn text-slate-400 hover:text-red-500 text-3xl p-2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white transition-colors">&times;</button>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
             <input type="hidden" id="formDeptOldId">
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-1">รหัสฝ่าย (ID)</label>
@@ -1488,9 +1500,9 @@
                 <input type="text" id="formDeptName" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-teal-500" placeholder="เช่น ฝ่ายผลิต MA">
             </div>
         </div>
-        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2">
-            <button onclick="closeDeptModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300">ยกเลิก</button>
-            <button onclick="saveDeptData()" class="px-5 py-2 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 shadow-md flex items-center"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
+        <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-2 shrink-0">
+            <button onclick="closeDeptModal()" class="dashboard-action-btn modal-btn-neutral px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-300 transition-colors">ยกเลิก</button>
+            <button onclick="saveDeptData()" class="dashboard-action-btn management-btn-teal px-5 py-2 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 shadow-md flex items-center transition-colors"><i class='bx bx-save mr-1'></i> บันทึกข้อมูล</button>
         </div>
     </div>
 </div>
@@ -1647,6 +1659,6 @@
 </div>
 
 <script src="config.js?v=20260824-5"></script>
-<script src="app.js?v=20260901-1"></script>
+<script src="app.js?v=20260901-2"></script>
 </body>
 </html>

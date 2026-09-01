@@ -2729,8 +2729,8 @@ async function loadDepartmentsData() {
                     <td class="p-4 text-center font-bold text-slate-700">${d.id}</td>
                     <td class="p-4 text-slate-600 font-medium">${deptName}</td>
                     <td class="p-4 text-center">
-                        <button onclick="openDeptModal('${d.id}')" class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
-                        <button onclick="deleteDeptData('${d.id}')" class="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
+                        <button onclick="openDeptModal('${d.id}')" class="dashboard-action-btn dashboard-btn-amber w-8 h-8 bg-amber-100 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-colors mr-1"><i class='bx bx-edit text-sm'></i></button>
+                        <button onclick="deleteDeptData('${d.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><i class='bx bx-trash text-sm'></i></button>
                     </td>
                 </tr>
             `;
