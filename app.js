@@ -38,6 +38,89 @@ let myOTDashboardHasActionMap = new Map();
 let myOTDashboardCurrentPage = 1;
 let myOTDashboardSearchTerm = "";
 let otDetailRequestToken = 0;
+let approvalPendingBadgeLoadToken = 0;
+
+function setApprovalPendingBadge(count) {
+    const badge = document.getElementById('approvalPendingBadge');
+    const menuTab = document.getElementById('menuTab2');
+    if (!badge || !menuTab) return;
+
+    const normalizedCount = Math.max(0, Number(count) || 0);
+    const hasPendingItems = normalizedCount > 0;
+    const displayCount = normalizedCount > 99 ? '99+' : String(normalizedCount);
+    const accessibleLabel = hasPendingItems
+        ? `การขออนุญาต มี ${normalizedCount} รายการรออนุมัติ`
+        : 'การขออนุญาต';
+
+    badge.textContent = displayCount;
+    badge.setAttribute('aria-label', hasPendingItems
+        ? `${normalizedCount} รายการรออนุมัติ`
+        : 'ไม่มีรายการรออนุมัติ');
+    badge.classList.toggle('hidden', !hasPendingItems);
+    menuTab.setAttribute('aria-label', accessibleLabel);
+}
+
+function getEligiblePendingApprovalSteps(myPendingSteps, allSteps) {
+    const stepsByRequest = new Map();
+    (allSteps || []).forEach(step => {
+        if (!stepsByRequest.has(step.request_id)) stepsByRequest.set(step.request_id, []);
+        stepsByRequest.get(step.request_id).push(step);
+    });
+
+    const eligibleSteps = (myPendingSteps || []).filter(step => {
+        const requestSteps = stepsByRequest.get(step.request_id) || [];
+        return requestSteps
+            .filter(item => Number(item.step_order) < Number(step.step_order))
+            .every(item => item.status === 'Approved');
+    });
+
+    return { eligibleSteps, stepsByRequest };
+}
+
+async function refreshApprovalPendingBadge() {
+    const badgeLoadToken = ++approvalPendingBadgeLoadToken;
+    const userId = currentUser?.id;
+
+    if (!userId || currentUser?.role === 'User') {
+        setApprovalPendingBadge(0);
+        return;
+    }
+
+    try {
+        const { data: myPendingSteps, error: pendingError } = await supabaseClient
+            .from('approval_steps')
+            .select('request_id, step_order')
+            .eq('approver_id', userId)
+            .eq('status', 'Pending');
+
+        if (pendingError) throw pendingError;
+        if (badgeLoadToken !== approvalPendingBadgeLoadToken || currentUser?.id !== userId) return;
+
+        if (!myPendingSteps || myPendingSteps.length === 0) {
+            setApprovalPendingBadge(0);
+            return;
+        }
+
+        const requestIds = [...new Set(myPendingSteps.map(step => step.request_id).filter(Boolean))];
+        if (requestIds.length === 0) {
+            setApprovalPendingBadge(0);
+            return;
+        }
+
+        const { data: allSteps, error: allStepsError } = await supabaseClient
+            .from('approval_steps')
+            .select('request_id, step_order, status')
+            .in('request_id', requestIds);
+
+        if (allStepsError) throw allStepsError;
+        if (badgeLoadToken !== approvalPendingBadgeLoadToken || currentUser?.id !== userId) return;
+
+        const { eligibleSteps } = getEligiblePendingApprovalSteps(myPendingSteps, allSteps);
+        setApprovalPendingBadge(eligibleSteps.length);
+    } catch (err) {
+        console.error('Load Approval Pending Badge Error:', err);
+    }
+}
 
 function invalidateOTDerivedViews() {
     myOTDashboardRequests = [];
@@ -221,6 +304,7 @@ function showAuthenticatedDashboard(user) {
     document.getElementById("pageformLogin").style.display = "none";
     document.getElementById("dashboardPage").style.display = "block";
     changePage(1);
+    refreshApprovalPendingBadge();
 }
 
 async function fetchAuthenticatedProfile(authUserId) {
@@ -754,12 +838,14 @@ async function loadApprovalQueueData() {
         if (stepErr) throw stepErr;
 
         if (!myPendingSteps || myPendingSteps.length === 0) {
+            if (!isStaleLoad()) setApprovalPendingBadge(0);
             showEmptyState();
             return;
         }
 
         const requestIds = [...new Set(myPendingSteps.map(step => step.request_id).filter(Boolean))];
         if (requestIds.length === 0) {
+            if (!isStaleLoad()) setApprovalPendingBadge(0);
             showEmptyState();
             return;
         }
@@ -779,18 +865,12 @@ async function loadApprovalQueueData() {
         if (allStepsResult.error) throw allStepsResult.error;
         if (requestsResult.error) throw requestsResult.error;
 
-        const stepsByRequest = new Map();
-        (allStepsResult.data || []).forEach(step => {
-            if (!stepsByRequest.has(step.request_id)) stepsByRequest.set(step.request_id, []);
-            stepsByRequest.get(step.request_id).push(step);
-        });
+        const { eligibleSteps, stepsByRequest } = getEligiblePendingApprovalSteps(
+            myPendingSteps,
+            allStepsResult.data || []
+        );
 
-        const eligibleSteps = myPendingSteps.filter(step => {
-            const requestSteps = stepsByRequest.get(step.request_id) || [];
-            return requestSteps
-                .filter(item => Number(item.step_order) < Number(step.step_order))
-                .every(item => item.status === 'Approved');
-        });
+        if (!isStaleLoad()) setApprovalPendingBadge(eligibleSteps.length);
 
         if (eligibleSteps.length === 0) {
             showEmptyState();
@@ -1391,6 +1471,8 @@ async function logoutUsers() {
         timer: 2000 // ตั้งให้ปิดอัตโนมัติใน 2 วินาทีได้ด้วยค่ะ
     }).then(() => {
         currentUser = null;
+        approvalPendingBadgeLoadToken++;
+        setApprovalPendingBadge(0);
         localStorage.removeItem('oms_user_session'); // ✨ เพิ่มบรรทัดนี้: ล้างการจำล็อกอินทิ้งเมื่อกดออกจากระบบ
         document.getElementById("dashboardPage").style.display = "none";
         document.getElementById("pageformLogin").style.display = "flex"; 
@@ -3877,6 +3959,7 @@ function loadCurrentApprovalTab() {
     if (currentApprovalTab === 'pending') {
         loadApprovalQueueData();
     } else {
+        refreshApprovalPendingBadge();
         loadProcessedApprovalData();
     }
 }
@@ -4237,6 +4320,7 @@ async function superAdminConfirmResetStatus() {
             invalidateProcessedApprovalSearchCache();
             Swal.fire('สำเร็จ', 'ดึงกลับเป็น Pending ที่ Step 1 เรียบร้อยแล้วค่ะ ✨', 'success');
             closeSuperAdminEditModal();
+            refreshApprovalPendingBadge();
             loadProcessedApprovalData();
         } catch (err) {
             console.error("SuperAdmin Reset Error:", err);

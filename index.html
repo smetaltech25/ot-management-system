@@ -481,9 +481,10 @@
               <i class='bx bxs-home mr-4 text-xl shrink-0'></i> 
               <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">หน้าแรก</span>
             </button>
-            <button onclick="changePage(2)" id="menuTab2" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
+            <button onclick="changePage(2)" id="menuTab2" aria-label="การขออนุญาต" class="relative w-full flex items-center px-4 pr-12 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
               <i class='bx bx-file mr-4 text-xl shrink-0'></i> 
               <span class="transition-opacity duration-300 sm:opacity-0 sm:group-hover:opacity-100">การขออนุญาต</span>
+              <span id="approvalPendingBadge" role="status" aria-live="polite" aria-label="ไม่มีรายการรออนุมัติ" class="hidden absolute right-2 sm:group-hover:right-3 top-1/2 -translate-y-1/2 min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] leading-none font-bold shadow-sm ring-2 ring-white dark:ring-slate-800 flex items-center justify-center transition-all">0</span>
             </button>
             <button onclick="changePage(3)" id="menuTab3" class="w-full flex items-center px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all overflow-hidden">
               <i class='bx bxs-calendar mr-4 text-xl shrink-0'></i> 
@@ -1659,6 +1660,6 @@
 </div>
 
 <script src="config.js?v=20260824-5"></script>
-<script src="app.js?v=20260901-2"></script>
+<script src="app.js?v=20260901-3"></script>
 </body>
 </html>
