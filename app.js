@@ -3849,8 +3849,8 @@ function switchApprovalTab(tab) {
     if (!btnPending || !btnProcessed) return;
 
     if (tab === 'pending') {
-        btnPending.className = "px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
-        btnProcessed.className = "px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
+        btnPending.className = "approval-tab-btn approval-tab-active px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
+        btnProcessed.className = "approval-tab-btn approval-tab-inactive px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
         
         if (pageTitle) pageTitle.innerText = "รายการรออนุมัติ OT";
         if (bulkApproveBtn) bulkApproveBtn.style.display = "";
@@ -3859,8 +3859,8 @@ function switchApprovalTab(tab) {
         renderProcessedApprovalPagination();
     } else {
         if (previousTab !== 'processed') processedApprovalCurrentPage = 1;
-        btnProcessed.className = "px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
-        btnPending.className = "px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
+        btnProcessed.className = "approval-tab-btn approval-tab-active px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap";
+        btnPending.className = "approval-tab-btn approval-tab-inactive px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap";
         
         if (pageTitle) pageTitle.innerText = "รายการดำเนินการแล้ว (SuperAdmin)";
         if (bulkApproveBtn) bulkApproveBtn.style.display = "none";
@@ -4021,7 +4021,7 @@ async function loadProcessedApprovalData() {
                 </td>
                 <td class="p-4 text-center">${statusBadge}</td>
                 <td class="p-4 text-center">
-                    <button onclick="openSuperAdminEditModal('${request.id}')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/60 rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1">
+                    <button onclick="openSuperAdminEditModal('${request.id}')" class="dashboard-action-btn dashboard-btn-amber px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/60 rounded-xl text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1">
                         <i class="bx bx-edit-alt text-sm"></i>
                         <span>แก้ไข</span>
                     </button>

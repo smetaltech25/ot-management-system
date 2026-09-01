@@ -96,6 +96,13 @@
       box-shadow: none !important;
     }
     html.dark .dashboard-btn-orange:hover { background-color: rgba(249, 115, 22, 0.28) !important; }
+    html.dark .dashboard-btn-amber {
+      background-color: rgba(245, 158, 11, 0.14) !important;
+      border-color: rgba(251, 191, 36, 0.36) !important;
+      color: #fcd34d !important;
+      box-shadow: none !important;
+    }
+    html.dark .dashboard-btn-amber:hover { background-color: rgba(245, 158, 11, 0.26) !important; }
     html.dark .dashboard-btn-red {
       background-color: rgba(239, 68, 68, 0.16) !important;
       border-color: rgba(248, 113, 113, 0.34) !important;
@@ -128,6 +135,27 @@
     html.dark .modal-close-btn:hover {
       background-color: rgba(239, 68, 68, 0.14) !important;
       color: #fca5a5 !important;
+    }
+    .approval-tab-btn { border: 1px solid transparent; }
+    html.dark .approval-tab-group {
+      background-color: #34384c !important;
+      border: 1px solid #4b5563 !important;
+    }
+    html.dark .approval-tab-active {
+      background-color: rgba(59, 130, 246, 0.16) !important;
+      border-color: rgba(96, 165, 250, 0.34) !important;
+      color: #93c5fd !important;
+      box-shadow: none !important;
+    }
+    html.dark .approval-tab-inactive {
+      background-color: transparent !important;
+      border-color: transparent !important;
+      color: #94a3b8 !important;
+      box-shadow: none !important;
+    }
+    html.dark .approval-tab-inactive:hover {
+      background-color: rgba(148, 163, 184, 0.10) !important;
+      color: #cbd5e1 !important;
     }
     html.dark .approver-card {
       background-color: #2a2d3e !important;
@@ -401,7 +429,7 @@
           <a href="#" onclick="Swal.fire('แจ้งเตือน', 'กรุณาติดต่อฝ่ายบุคคลนะคะ', 'info'); return false;" class="text-sm font-medium text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">ลืมรหัสผ่าน?</a>
         </div>
 
-        <button type="button" onclick="loginUsersSupabase()" class="w-full py-3 mt-2 bg-[#3b82f6] text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all hover:-translate-y-0.5">
+        <button type="button" onclick="loginUsersSupabase()" class="dashboard-action-btn dashboard-btn-blue w-full py-3 mt-2 bg-[#3b82f6] text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all hover:-translate-y-0.5">
           เข้าสู่ระบบ
         </button>
 
@@ -613,19 +641,19 @@
     <h3 class="font-bold text-slate-800 text-lg w-full sm:w-auto scroll-mt-24 focus:outline-none" id="page2Title" tabindex="-1">รายการรออนุมัติ OT</h3>
     
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-start sm:justify-end" id="approvalActionButtons">
-        <button onclick="reloadCurrentApprovalTab()" class="p-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
+        <button onclick="reloadCurrentApprovalTab()" class="dashboard-action-btn dashboard-btn-blue p-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-blue-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
             <i class='bx bx-refresh text-xl sm:mr-1.5'></i> รีโหลด
         </button>
-        <button id="bulkApproveBtn" onclick="bulkApproveSteps('Approved')" class="p-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
+        <button id="bulkApproveBtn" onclick="bulkApproveSteps('Approved')" class="dashboard-action-btn dashboard-btn-green p-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-green-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
             <i class='bx bx-check text-xl sm:mr-1.5'></i> อนุมัติ
         </button>
-        <button id="bulkRejectBtn" onclick="bulkApproveSteps('Rejected')" class="p-2 sm:px-4 sm:py-2 bg-red-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
+        <button id="bulkRejectBtn" onclick="bulkApproveSteps('Rejected')" class="dashboard-action-btn dashboard-btn-red p-2 sm:px-4 sm:py-2 bg-red-500 text-white rounded-xl text-[13px] sm:text-sm font-semibold hover:bg-red-600 transition-colors shadow-md flex items-center justify-center text-center whitespace-nowrap">
             <i class='bx bx-x text-xl sm:mr-1.5'></i> ไม่อนุมัติ
         </button>
         
-        <div id="approvalTabContainer" style="display:none" class="bg-slate-100 dark:bg-slate-700/50 p-1 rounded-xl flex items-center shrink-0">
-            <button id="tabPending" onclick="switchApprovalTab('pending')" class="px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap">รออนุมัติ</button>
-            <button id="tabProcessed" onclick="switchApprovalTab('processed')" class="px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap">ดำเนินการแล้ว</button>
+        <div id="approvalTabContainer" style="display:none" class="approval-tab-group bg-slate-100 dark:bg-slate-700/50 p-1 rounded-xl flex items-center shrink-0">
+            <button id="tabPending" onclick="switchApprovalTab('pending')" class="approval-tab-btn approval-tab-active px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition-all duration-200 whitespace-nowrap">รออนุมัติ</button>
+            <button id="tabProcessed" onclick="switchApprovalTab('processed')" class="approval-tab-btn approval-tab-inactive px-3.5 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-600/50 transition-all duration-200 whitespace-nowrap">ดำเนินการแล้ว</button>
         </div>
     </div>
 </div>
@@ -652,7 +680,7 @@
                 <i class="bx bx-x text-xl" aria-hidden="true"></i>
             </button>
         </div>
-        <button id="approvalSearchBtn" type="submit" class="h-11 px-5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-sm inline-flex items-center justify-center gap-2 sm:min-w-[112px]">
+        <button id="approvalSearchBtn" type="submit" class="dashboard-action-btn dashboard-btn-blue h-11 px-5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-sm inline-flex items-center justify-center gap-2 sm:min-w-[112px]">
             <i class="bx bx-search text-lg" aria-hidden="true"></i>
             <span>ค้นหา</span>
         </button>
@@ -1602,15 +1630,15 @@
 
         <!-- Footer Buttons (3 actions matching LMS design) -->
         <div class="p-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
-            <button type="button" onclick="superAdminConfirmResetStatus()" class="flex-1 py-2.5 px-3 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-1.5">
+            <button type="button" onclick="superAdminConfirmResetStatus()" class="dashboard-action-btn dashboard-btn-amber flex-1 py-2.5 px-3 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-1.5">
                 <i class='bx bx-refresh text-lg'></i>
                 <span>ดึงกลับ (Pending)</span>
             </button>
-            <button type="button" onclick="superAdminConfirmDelete()" class="flex-1 py-2.5 px-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-1.5">
+            <button type="button" onclick="superAdminConfirmDelete()" class="dashboard-action-btn dashboard-btn-red flex-1 py-2.5 px-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-1.5">
                 <i class='bx bx-block text-lg'></i>
                 <span>ยกเลิก/ลบรายการ</span>
             </button>
-            <button type="button" onclick="superAdminSaveEditedOT()" class="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5">
+            <button type="button" onclick="superAdminSaveEditedOT()" class="dashboard-action-btn dashboard-btn-blue flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5">
                 <i class='bx bx-save text-lg'></i>
                 <span>บันทึกข้อมูล</span>
             </button>
@@ -1619,6 +1647,6 @@
 </div>
 
 <script src="config.js?v=20260824-5"></script>
-<script src="app.js?v=20260831-2"></script>
+<script src="app.js?v=20260901-1"></script>
 </body>
 </html>
