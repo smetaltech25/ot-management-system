@@ -25,6 +25,16 @@
   <style>
     body { font-family: 'Prompt', sans-serif; }
     .active-menu { @apply bg-blue-50 text-blue-600 font-semibold; }
+    html:not(.dark) aside nav button.active-menu {
+      background-color: #3b82f6 !important;
+      color: #ffffff !important;
+      font-weight: 600;
+      box-shadow: 0 8px 18px rgba(59, 130, 246, 0.24);
+    }
+    html:not(.dark) aside nav button.active-menu:hover {
+      background-color: #2563eb !important;
+      color: #ffffff !important;
+    }
     /* =========================================
        ✨ Dark Mode Global Overrides ✨
        (เปลี่ยนสีทั้งระบบอัตโนมัติ โดยไม่ต้องแก้ HTML)
