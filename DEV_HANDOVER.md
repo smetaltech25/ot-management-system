@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 31 สิงหาคม 2026
+**อัปเดตล่าสุด:** 1 กันยายน 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) และจ๊ะ (Codex) สำหรับพี่ต้น 💖
 
@@ -13,8 +13,40 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260831-2` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260901-2` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 อัปเดตโดยจ๊ะ: ปรับสีปุ่ม Dark Mode และหน้า Departments Deploy วันที่ 01/09/2026
+
+### A. Dark Surface + Semantic Accent
+
+* ปรับปุ่มในหน้า Login, รายการรออนุมัติ, รายการดำเนินการแล้วของ SuperAdmin และ Modal แก้ไขคำขอพิเศษ ให้กลมกลืนกับพื้นหลัง Dark Mode
+* ใช้สีตามความหมายเดิมของคำสั่ง: น้ำเงินสำหรับ Login/Reload/Search/Save, เขียวสำหรับ Approve, แดงสำหรับ Reject/Delete, เหลืองอำพันสำหรับ Edit/Reset และ Slate สำหรับปุ่มรองหรือยกเลิก
+* ปรับ Tab `รออนุมัติ | ดำเนินการแล้ว` ให้ใช้พื้น Slate มืดและแสดง Active state ด้วยข้อความ/ขอบสีน้ำเงิน
+* สีเหล่านี้ทำงานเฉพาะ Dark Mode; Light Mode ยังคงสีเดิมและไม่มีการเปลี่ยน Workflow หรือ Event handler ของปุ่ม
+* Commit `8177558` — `Refine dark mode action buttons`
+
+### B. หน้า Departments และ Modal เพิ่ม/แก้ไขฝ่าย
+
+* ปรับปุ่ม `เพิ่มฝ่าย` และ `บันทึกข้อมูล` เป็น Teal แบบโปร่งใน Dark Mode
+* ปรับปุ่มแก้ไขเป็น Amber, ปุ่มลบเป็น Red และปุ่มยกเลิกเป็น Slate ให้สอดคล้องกับ Semantic palette ของหน้าอื่น
+* ปรับ Header และ Title ของ Modal เพิ่ม/แก้ไขฝ่ายให้ใช้ Teal accent บนพื้นมืด
+* ปรับ Modal ให้รองรับ iPhone Safari/Chrome ด้วย `fixed inset-0`, Safe Area Insets, `max-height: calc(100svh - 2rem)` และให้เลื่อนเฉพาะ Modal Body
+* การเปลี่ยนครั้งนี้ไม่แตะ Supabase query, CRUD function, Database schema, RLS, Authentication หรือสิทธิ์ผู้ใช้งาน
+* Commit `5842f55` — `Polish department dark mode controls`
+
+### C. ผลตรวจและ Deployment
+
+* ไฟล์แอปที่แก้: `index.html`, `app.js`
+* ตรวจ `node --check app.js` และ `git diff --check` ผ่าน
+* ตรวจ Computed style ของปุ่มใน Light/Dark Mode ครบตาม Semantic palette และไม่พบ JavaScript Console Error
+* ทดสอบหน้า Login ที่ viewport `390 × 844`: ไม่มี Horizontal overflow
+* ตรวจโครง Modal Departments: Panel ใช้ Flex/Overflow hidden, Body ใช้ `overflow-y: auto`, `min-height: 0` และจำกัดความสูงด้วย `100svh`
+* GitHub Pages Run `33456980685` และ `33457858322` Build/Deploy สำเร็จ
+* Production ตรวจพบ `app.js?v=20260901-2` และ Class ชุดสี Departments เวอร์ชันใหม่แล้ว
+* พี่ต้นตรวจ Production และยืนยันว่าผลการทำงานถูกต้องแล้ว
 
 ---
 
