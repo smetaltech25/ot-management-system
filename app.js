@@ -1019,22 +1019,38 @@ async function actionApproveStep(stepId, action, requestId, currentOrder, totalS
     if (!reasonInput) return; // กรณีผู้ใช้กดยกเลิก
 
     try {
-        const now = new Date();
-const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        if (isSupabaseAuthMode()) {
+            const { data, error } = await supabaseClient.rpc('oms_review_steps', {
+                target_step_ids: [stepId],
+                target_action: action,
+                target_comment: reasonInput.trim()
+            });
 
-await supabaseClient
-    .from('approval_steps')
-    .update({ 
-        status: action, 
-        approved_at: timestampStr,
-        comment: reasonInput.trim()
-    })
-    .eq('id', stepId);
+            if (error) throw error;
+            if (!data || data.length !== 1) {
+                throw new Error('ไม่พบขั้นอนุมัติ หรือสถานะของคำขอเปลี่ยนแปลงไปแล้ว');
+            }
+        } else {
+            const now = new Date();
+            const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-        if (action === 'Rejected') {
-            await supabaseClient.from('ot_requests').update({ status: 'Rejected' }).eq('id', requestId);
-        } else if (action === 'Approved' && currentOrder === totalSteps) {
-            await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
+            const { error: stepUpdateError } = await supabaseClient
+                .from('approval_steps')
+                .update({
+                    status: action,
+                    approved_at: timestampStr,
+                    comment: reasonInput.trim()
+                })
+                .eq('id', stepId);
+            if (stepUpdateError) throw stepUpdateError;
+
+            if (action === 'Rejected') {
+                const { error: requestUpdateError } = await supabaseClient.from('ot_requests').update({ status: 'Rejected' }).eq('id', requestId);
+                if (requestUpdateError) throw requestUpdateError;
+            } else if (action === 'Approved' && currentOrder === totalSteps) {
+                const { error: requestUpdateError } = await supabaseClient.from('ot_requests').update({ status: 'Approved' }).eq('id', requestId);
+                if (requestUpdateError) throw requestUpdateError;
+            }
         }
 
         Swal.fire('สำเร็จ!', 'ดำเนินการพิจารณาคำขอเรียบร้อยแล้วค่ะ! 🎉', 'success');
@@ -1042,6 +1058,7 @@ await supabaseClient
 
     } catch (err) {
         console.error("Action Approve Processing Error:", err);
+        Swal.fire('ดำเนินการไม่ได้', 'รายการอาจถูกแก้ไขหรือดำเนินการจากผู้ใช้อื่นแล้ว กรุณาโหลดรายการใหม่ค่ะ', 'error');
     }
 }
 
@@ -1355,49 +1372,61 @@ const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
             submit_date: todayStr
         };
 
-        if (editId) {
-            // กรณีแก้ไข: อัปเดตข้อมูลเดิมตามปกติ
-            const { data: updatedRequest, error: updateRequestError } = await supabaseClient
-                .from('ot_requests')
-                .update(requestPayload)
-                .eq('id', editId)
-                .eq('user_id', currentUser.id)
-                .eq('status', 'Pending')
-                .select('id');
+        if (isSupabaseAuthMode()) {
+            const { data, error } = await supabaseClient.rpc('oms_save_pending_ot_request', {
+                target_request_id: editId || null,
+                target_ot_type_id: otType,
+                target_date_start: dateStart,
+                target_description: description,
+                target_approver_ids: finalSelectedApprovers.map(approver => approver.id)
+            });
 
-            if (updateRequestError) throw updateRequestError;
-            if (!updatedRequest || updatedRequest.length !== 1) {
-                throw new Error('คำขอไม่ถูกแก้ไข: รายการเริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว');
+            if (error) throw error;
+            if (!data || data.length !== 1 || !data[0].request_id) {
+                throw new Error('ฐานข้อมูลไม่สามารถบันทึกคำขอและสายอนุมัติให้ครบถ้วน');
+            }
+            reqId = data[0].request_id;
+        } else {
+            if (editId) {
+                // Legacy mode: คงพฤติกรรมเดิมไว้เพื่อ Backward compatibility
+                const { data: updatedRequest, error: updateRequestError } = await supabaseClient
+                    .from('ot_requests')
+                    .update(requestPayload)
+                    .eq('id', editId)
+                    .eq('user_id', currentUser.id)
+                    .eq('status', 'Pending')
+                    .select('id');
+
+                if (updateRequestError) throw updateRequestError;
+                if (!updatedRequest || updatedRequest.length !== 1) {
+                    throw new Error('คำขอไม่ถูกแก้ไข: รายการเริ่มเข้าสู่ขั้นตอนการพิจารณาแล้ว');
+                }
+
+                const { error: deleteStepsError } = await supabaseClient
+                    .from('approval_steps')
+                    .delete()
+                    .eq('request_id', editId);
+                if (deleteStepsError) throw deleteStepsError;
+            } else {
+                const { data: newReq, error: insertErr } = await supabaseClient
+                    .from('ot_requests')
+                    .insert([requestPayload])
+                    .select('id')
+                    .single();
+
+                if (insertErr) throw insertErr;
+                reqId = newReq.id;
             }
 
-            const { error: deleteStepsError } = await supabaseClient
-                .from('approval_steps')
-                .delete()
-                .eq('request_id', editId);
-            if (deleteStepsError) throw deleteStepsError;
-        } else {
-            // ✨ 2. กรณีสร้างใหม่: สั่ง Insert แล้วพ่วงคำสั่ง .select('id').single() เพื่อดึงรหัสใหม่กลับมา
-            const { data: newReq, error: insertErr } = await supabaseClient
-                .from('ot_requests')
-                .insert([requestPayload])
-                .select('id')
-                .single();
+            const stepsData = [
+                { id: reqId + "-STEP1", request_id: reqId, step_order: 1, approver_id: finalSelectedApprovers[0].id, status: 'Pending', assigned_date: todayStr },
+                { id: reqId + "-STEP2", request_id: reqId, step_order: 2, approver_id: finalSelectedApprovers[1].id, status: 'Pending', assigned_date: todayStr },
+                { id: reqId + "-STEP3", request_id: reqId, step_order: 3, approver_id: finalSelectedApprovers[2].id, status: 'Pending', assigned_date: todayStr }
+            ];
 
-            if (insertErr) throw insertErr;
-            
-            // นำรหัสใหม่เอี่ยม (เช่น OTR-0039) เก็บใส่ตัวแปร reqId ไว้ใช้สร้างคิวอนุมัติและส่ง Webhook ต่อ
-            reqId = newReq.id; 
+            const { error: insertStepsError } = await supabaseClient.from('approval_steps').insert(stepsData);
+            if (insertStepsError) throw insertStepsError;
         }
-
-        // นำ reqId ไปสร้าง Step อนุมัติ 1-2-3 (โค้ดส่วนนี้ใช้ของเดิมได้เลยค่ะ)
-        const stepsData = [
-            { id: reqId + "-STEP1", request_id: reqId, step_order: 1, approver_id: finalSelectedApprovers[0].id, status: 'Pending', assigned_date: todayStr },
-            { id: reqId + "-STEP2", request_id: reqId, step_order: 2, approver_id: finalSelectedApprovers[1].id, status: 'Pending', assigned_date: todayStr },
-            { id: reqId + "-STEP3", request_id: reqId, step_order: 3, approver_id: finalSelectedApprovers[2].id, status: 'Pending', assigned_date: todayStr }
-        ];
-
-        const { error: insertStepsError } = await supabaseClient.from('approval_steps').insert(stepsData);
-        if (insertStepsError) throw insertStepsError;
 
         invalidateOTDerivedViews();
 
@@ -1714,50 +1743,62 @@ async function bulkApproveSteps(action) {
         const now = new Date();
         const timestampStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} : ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-        // อัปเดตขั้นอนุมัติที่ถูกเลือกทั้งหมดในคำสั่งเดียว
-        const { error: stepsUpdateError } = await supabaseClient
-            .from('approval_steps')
-            .update({
-                status: action,
-                approved_at: timestampStr,
-                comment: reasonInput.trim()
-            })
-            .in('id', stepIds);
+        if (isSupabaseAuthMode()) {
+            const { data, error } = await supabaseClient.rpc('oms_review_steps', {
+                target_step_ids: stepIds,
+                target_action: action,
+                target_comment: reasonInput.trim()
+            });
 
-        if (stepsUpdateError) throw stepsUpdateError;
+            if (error) throw error;
+            if (!data || data.length !== stepIds.length) {
+                throw new Error('บางรายการถูกดำเนินการไปแล้ว กรุณาโหลดรายการใหม่');
+            }
+        } else {
+            // Legacy mode: คงการเขียนตรงแบบเดิมไว้เพื่อ Backward compatibility
+            const { error: stepsUpdateError } = await supabaseClient
+                .from('approval_steps')
+                .update({
+                    status: action,
+                    approved_at: timestampStr,
+                    comment: reasonInput.trim()
+                })
+                .in('id', stepIds);
 
-        // อัปเดตสถานะคำขอเป็นชุด เฉพาะรายการที่ต้องปิด Workflow เท่านั้น
-        const requestUpdatePromises = [];
-        if (action === 'Rejected') {
-            const rejectedRequestIds = [...new Set(selectedItems.map(item => item.requestId).filter(Boolean))];
-            if (rejectedRequestIds.length > 0) {
-                requestUpdatePromises.push(
-                    supabaseClient.from('ot_requests').update({ status: 'Rejected' }).in('id', rejectedRequestIds)
-                );
-                requestUpdatePromises.push(
-                    supabaseClient.from('approval_steps')
-                        .update({ status: 'Rejected' })
-                        .in('request_id', rejectedRequestIds)
-                        .eq('status', 'Pending')
-                );
+            if (stepsUpdateError) throw stepsUpdateError;
+
+            const requestUpdatePromises = [];
+            if (action === 'Rejected') {
+                const rejectedRequestIds = [...new Set(selectedItems.map(item => item.requestId).filter(Boolean))];
+                if (rejectedRequestIds.length > 0) {
+                    requestUpdatePromises.push(
+                        supabaseClient.from('ot_requests').update({ status: 'Rejected' }).in('id', rejectedRequestIds)
+                    );
+                    requestUpdatePromises.push(
+                        supabaseClient.from('approval_steps')
+                            .update({ status: 'Rejected' })
+                            .in('request_id', rejectedRequestIds)
+                            .eq('status', 'Pending')
+                    );
+                }
+            } else if (action === 'Approved') {
+                const finalApprovedRequestIds = [...new Set(
+                    selectedItems
+                        .filter(item => item.currentOrder === item.totalSteps)
+                        .map(item => item.requestId)
+                        .filter(Boolean)
+                )];
+                if (finalApprovedRequestIds.length > 0) {
+                    requestUpdatePromises.push(
+                        supabaseClient.from('ot_requests').update({ status: 'Approved' }).in('id', finalApprovedRequestIds)
+                    );
+                }
             }
-        } else if (action === 'Approved') {
-            const finalApprovedRequestIds = [...new Set(
-                selectedItems
-                    .filter(item => item.currentOrder === item.totalSteps)
-                    .map(item => item.requestId)
-                    .filter(Boolean)
-            )];
-            if (finalApprovedRequestIds.length > 0) {
-                requestUpdatePromises.push(
-                    supabaseClient.from('ot_requests').update({ status: 'Approved' }).in('id', finalApprovedRequestIds)
-                );
-            }
+
+            const requestUpdateResults = await Promise.all(requestUpdatePromises);
+            const requestUpdateError = requestUpdateResults.find(result => result.error)?.error;
+            if (requestUpdateError) throw requestUpdateError;
         }
-
-        const requestUpdateResults = await Promise.all(requestUpdatePromises);
-        const requestUpdateError = requestUpdateResults.find(result => result.error)?.error;
-        if (requestUpdateError) throw requestUpdateError;
 
         const approvedPayloadData = action === 'Approved'
             ? selectedItems.map(item => {

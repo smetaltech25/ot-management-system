@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 1 กันยายน 2026
+**อัปเดตล่าสุด:** 7 กันยายน 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) และจ๊ะ (Codex) สำหรับพี่ต้น 💖
 
@@ -17,6 +17,21 @@
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
 
 ---
+
+## 🆕 อีเมล OMS รองรับ Outlook และมือถือ — Deploy 07/09/2026
+
+* แก้ไฟล์ `OMS Webhook Email/รหัส.gs`: เพิ่ม `EMAIL_FONT_STACK` และ `buildEmailLayout()` ใช้ Table + Inline CSS และ MSO conditional table แทนกรอบ Div สำหรับ Classic Outlook
+* Version 6: ฟอนต์ Tahoma/Arial, เนื้อหา 16px, ตาราง 14–15px, กรอบอีเมลรวม 680px และคำขอใหม่ 560px; เปลี่ยนรายละเอียดคำขอใหม่จาก List เป็น Table
+* Version 7 (Production ปัจจุบันของงานนี้): เพิ่ม Media query ไม่เกิน 480px พร้อมคลาส `oms-outer`, `oms-title`, `oms-content`; ลดขอบและระยะห่าง, หัวเรื่อง 18px, เนื้อหา 14px, หัวตาราง 11px, ข้อมูล 12px และรหัส 10px; ป้องกันหัวตารางแตกบรรทัด โดยรักษารูปแบบ Desktop ของ Version 6
+* คงเงื่อนไขส่ง, ผู้รับ, หัวข้อ และข้อมูลเดิม ไม่แก้ Frontend, Database, Auth หรือ Approval workflow
+* Script: [OMS Webhook Email](https://script.google.com/d/1B3kPaHb6uxurpV6e-U3VTgJfuayKlw6QRAHvCX3eDuXamN372Z9N3LJ2/edit), เจ้าของ `smetaltech25@gmail.com`
+* อัปเดต Deployment เดิม `AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw` เป็น Version 7; URL ใน `app.js` ไม่เปลี่ยน
+* ตรวจ Syntax และ `git diff --check` ผ่าน; Version 6 ดึง Remote กลับเทียบตรงกับ Local และ Webhook ทดสอบรายการว่างตอบ success; Version 7 CLI ยืนยัน Deploy @7 และส่งอีเมลทดสอบ 3 แถวตอบ success
+* ส่งตัวอย่างไป `pongsak@smetaltech.co.th`: `OMS Outlook Test` (v6) และ `OMS Mobile Test v7` (v7)
+* พี่ต้นส่งภาพ Classic Outlook ของ v6 และยืนยันว่าสวย; หลัง v7 พี่ต้นยืนยันมุมมองมือถือว่า “ok สวยงาม” ถือเป็นการยอมรับรูปแบบจากผู้ใช้ ไม่ใช่การทดสอบทุก Mail client/ทุกอุปกรณ์โดยอัตโนมัติ
+* อีเมลเก่าจะไม่เปลี่ยนหน้าตา ต้องเปิดฉบับส่งใหม่; รักษารูปแบบที่ผู้ใช้ยอมรับนี้ในการแก้ครั้งต่อไป
+* `clasp` เชื่อมบัญชี `smetaltech25@gmail.com` แล้ว; เปิด Apps Script API ชั่วคราวเพื่อ Deploy และตรวจปิดคืนหลัง v6/v7 เรียบร้อย
+* งานนี้ Deploy Google Apps Script แล้ว แต่ยังไม่ได้ Commit/Push ไฟล์ Local เข้า GitHub; สำเนาทำงาน v7 อยู่ `outputs/oms-mobile-deploy`
 
 ## 🆕 อัปเดตโดยจ๊ะ: Active Menu โหมดสว่าง Deploy วันที่ 01/09/2026
 

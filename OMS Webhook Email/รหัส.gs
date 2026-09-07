@@ -15,6 +15,65 @@ const CONFIG = {
   REQ_TARGET_EMAIL: 'pongsak@smetaltech.co.th'
 };
 
+// ใช้ฟอนต์ที่มีติดมากับ Windows/Outlook และกำหนด Style แบบ Inline
+// เพราะ Classic Outlook ใช้ Microsoft Word ในการแสดงผล HTML Email
+const EMAIL_FONT_STACK = "Tahoma, Arial, sans-serif";
+
+function buildEmailLayout(headerColor, headerText, contentHtml, maxWidth) {
+  const safeWidth = maxWidth || 680;
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          @media only screen and (max-width: 480px) {
+            .oms-outer { padding: 12px 6px !important; }
+            .oms-title { padding: 16px 12px !important; font-size: 18px !important; line-height: 26px !important; }
+            .oms-content { padding: 18px 10px !important; }
+            .oms-content p { font-size: 14px !important; line-height: 22px !important; margin-bottom: 14px !important; }
+            .oms-content th { padding: 10px 3px !important; font-size: 11px !important; line-height: 18px !important; white-space: nowrap !important; }
+            .oms-content td { padding: 10px 3px !important; font-size: 12px !important; line-height: 19px !important; }
+            .oms-content td span { font-size: 10px !important; line-height: 16px !important; overflow-wrap: anywhere; }
+          }
+        </style>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: ${EMAIL_FONT_STACK}; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f1f5f9" style="width: 100%; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; background-color: #f1f5f9;">
+          <tr>
+            <td class="oms-outer" align="center" style="padding: 24px 12px;">
+              <!--[if mso]>
+              <table role="presentation" width="${safeWidth}" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+              <![endif]-->
+              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="width: 100%; max-width: ${safeWidth}px; border: 1px solid #dbe3ec; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; background-color: #ffffff;">
+                <tr>
+                  <td class="oms-title" align="center" bgcolor="${headerColor}" style="padding: 22px 24px; background-color: ${headerColor}; color: #ffffff; font-family: ${EMAIL_FONT_STACK}; font-size: 22px; line-height: 30px; mso-line-height-rule: exactly; font-weight: 700;">
+                    ${headerText}
+                  </td>
+                </tr>
+                <tr>
+                  <td class="oms-content" style="padding: 26px 28px; background-color: #ffffff; font-family: ${EMAIL_FONT_STACK}; font-size: 16px; line-height: 25px; mso-line-height-rule: exactly; color: #334155;">
+                    ${contentHtml}
+                  </td>
+                </tr>
+              </table>
+              <!--[if mso]>
+                  </td>
+                </tr>
+              </table>
+              <![endif]-->
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
 function doPost(e) {
   try {
     // รับข้อมูลที่ส่งมาจากหน้าเว็บ app.js
@@ -69,50 +128,44 @@ function processBulkApprove(records) {
     const approverName = userList[0].approver_name || userList[0].user_id;
     const subject = `แจ้งเตือนอนุมัติ OT ในระบบจาก ${approverName}`;
     
-    // สร้างตารางรายชื่อในอีเมล (✨ ล็อกความกว้าง % และจัด Center/Left ให้ตรงกันทุกช่อง)
+    // สร้างตารางรายชื่อด้วย Table + Inline CSS เพื่อรองรับ Classic Outlook
     let tableRows = '';
     userList.forEach((u, index) => {
       tableRows += `
         <tr>
-          <td width="10%" style="padding: 10px; border-bottom: 1px solid #eee; text-align: center; color: #475569;">${index + 1}</td>
-          <td width="45%" style="padding: 10px; border-bottom: 1px solid #eee; text-align: left; color: #334155;"><b>${u.fullname}</b><br><span style="font-size: 11px; color: #94a3b8;">${u.emp_id || '-'}</span></td>
-          <td width="25%" style="padding: 10px; border-bottom: 1px solid #eee; text-align: center; color: #475569;">${u.date}</td>
-          <td width="20%" style="padding: 10px; border-bottom: 1px solid #eee; text-align: center; color: #10b981;"><b>${u.hours} ชม.</b></td>
+          <td width="10%" align="center" valign="middle" style="width: 10%; padding: 14px 8px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 22px; mso-line-height-rule: exactly; text-align: center; color: #475569;">${index + 1}</td>
+          <td width="42%" align="left" valign="middle" style="width: 42%; padding: 14px 10px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 22px; mso-line-height-rule: exactly; text-align: left; color: #1e293b;"><strong>${u.fullname}</strong><br><span style="font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 19px; color: #64748b;">${u.emp_id || '-'}</span></td>
+          <td width="28%" align="center" valign="middle" style="width: 28%; padding: 14px 8px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 22px; mso-line-height-rule: exactly; text-align: center; color: #475569; white-space: nowrap;">${u.date}</td>
+          <td width="20%" align="center" valign="middle" style="width: 20%; padding: 14px 8px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 22px; mso-line-height-rule: exactly; text-align: center; color: #059669; white-space: nowrap;"><strong>${u.hours} ชม.</strong></td>
         </tr>
       `;
     });
 
-    const htmlBody = `
-      <div style="font-family: 'Prompt', sans-serif, Arial; color: #333; max-width: 700px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        <div style="background-color: #10b981; color: white; padding: 20px; text-align: center;">
-          <h2 style="margin: 0; font-size: 20px;">แจ้งขออนุมัติโอทีในระบบตามรายชื่อดังนี้</h2>
-        </div>
-        <div style="padding: 24px; background-color: #ffffff;">
-          <p style="margin-top: 0;">เรียนผู้เกี่ยวข้อง,</p>
-          <p>ระบบ OMS ได้ทำการ <b>ขออนุมัติ</b> ทำงานล่วงเวลา (OT) จำนวน <b style="color: #10b981;">${userList.length} รายการ</b> ดังนี้:</p>
-          
-          <!-- ✨ เพิ่ม width="100%" ที่ตัว table เพื่อบังคับ Outlook ให้วาดตารางเต็มกล่องพอดี -->
-          <table width="100%" style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; border-radius: 8px; overflow: hidden;">
-            <thead>
-              <tr style="background-color: #f8fafc; color: #64748b;">
-                <!-- ✨ ล็อก % ให้ตรงกับเนื้อหาด้านล่างเป๊ะๆ -->
-                <th width="10%" style="padding: 12px 10px; text-align: center;">ลำดับ</th>
-                <th width="45%" style="padding: 12px 10px; text-align: left;">ชื่อพนักงาน</th>
-                <th width="25%" style="padding: 12px 10px; text-align: center;">วันที่ทำ OT</th>
-                <th width="20%" style="padding: 12px 10px; text-align: center;">ชั่วโมง</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRows}
-            </tbody>
-          </table>
-          
-          <p style="margin-top: 24px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
-            ส่งอัตโนมัติโดย OMS Auto Agent <br> ${new Date().toLocaleString('th-TH')}
-          </p>
-        </div>
-      </div>
+    const contentHtml = `
+      <p style="margin: 0 0 14px 0; font-family: ${EMAIL_FONT_STACK}; font-size: 16px; line-height: 25px; mso-line-height-rule: exactly; color: #334155;">เรียนผู้เกี่ยวข้อง,</p>
+      <p style="margin: 0 0 20px 0; font-family: ${EMAIL_FONT_STACK}; font-size: 16px; line-height: 25px; mso-line-height-rule: exactly; color: #334155;">ระบบ OMS ได้ทำการ <strong>ขออนุมัติ</strong> ทำงานล่วงเวลา (OT) จำนวน <strong style="color: #059669;">${userList.length} รายการ</strong> ดังนี้:</p>
+
+      <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border: 1px solid #e2e8f0; border-collapse: collapse; table-layout: fixed; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+        <tr bgcolor="#f1f5f9" style="background-color: #f1f5f9;">
+          <th width="10%" align="center" style="width: 10%; padding: 13px 8px; font-family: ${EMAIL_FONT_STACK}; font-size: 14px; line-height: 20px; mso-line-height-rule: exactly; font-weight: 700; text-align: center; color: #475569;">ลำดับ</th>
+          <th width="42%" align="left" style="width: 42%; padding: 13px 10px; font-family: ${EMAIL_FONT_STACK}; font-size: 14px; line-height: 20px; mso-line-height-rule: exactly; font-weight: 700; text-align: left; color: #475569;">ชื่อพนักงาน</th>
+          <th width="28%" align="center" style="width: 28%; padding: 13px 8px; font-family: ${EMAIL_FONT_STACK}; font-size: 14px; line-height: 20px; mso-line-height-rule: exactly; font-weight: 700; text-align: center; color: #475569;">วันที่ทำ OT</th>
+          <th width="20%" align="center" style="width: 20%; padding: 13px 8px; font-family: ${EMAIL_FONT_STACK}; font-size: 14px; line-height: 20px; mso-line-height-rule: exactly; font-weight: 700; text-align: center; color: #475569;">ชั่วโมง</th>
+        </tr>
+        ${tableRows}
+      </table>
+
+      <p style="margin: 24px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
+        ส่งอัตโนมัติโดย OMS Auto Agent<br>${new Date().toLocaleString('th-TH')}
+      </p>
     `;
+
+    const htmlBody = buildEmailLayout(
+      '#10b981',
+      'แจ้งขออนุมัติโอทีในระบบตามรายชื่อดังนี้',
+      contentHtml,
+      680
+    );
 
     MailApp.sendEmail({
       to: email,
@@ -130,26 +183,35 @@ function processNewRequest(req) {
   if (req.user_id !== CONFIG.REQ_TARGET_USER) return;
 
   const subject = `⚠️ มีการขอโอที (ยื่นคำขอใหม่) • ${req.fullname}`;
-  const htmlBody = `
-    <div style="font-family: 'Prompt', sans-serif, Arial; color: #333; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-      <div style="background-color: #3b82f6; color: white; padding: 20px; text-align: center;">
-        <h2 style="margin: 0; font-size: 20px;">⚠️ คำขอโอทีใหม่เข้าระบบ</h2>
-      </div>
-      <div style="padding: 24px; background-color: #ffffff;">
-        <p style="margin-top: 0;">พนักงาน <b>${req.fullname}</b> (รหัส: ${req.user_id}) <br>ได้ทำการยื่นขอโอทีเข้าสู่ระบบค่ะ</p>
-        
-        <ul style="background-color: #f8fafc; padding: 20px 20px 20px 40px; border-radius: 8px; color: #475569; border: 1px solid #e2e8f0; margin-top: 15px;">
-          <li style="margin-bottom: 8px;"><b>วันที่ขอ:</b> ${req.date}</li>
-          <li style="margin-bottom: 8px;"><b>รหัสคำขอ:</b> ${req.id}</li>
-          <li><b>เหตุผล:</b> ${req.description || '-'}</li>
-        </ul>
-        
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
-          เวลาที่ส่งคำขอ: ${new Date().toLocaleString('th-TH')}
-        </p>
-      </div>
-    </div>
+  const contentHtml = `
+    <p style="margin: 0 0 18px 0; font-family: ${EMAIL_FONT_STACK}; font-size: 16px; line-height: 25px; mso-line-height-rule: exactly; color: #334155;">พนักงาน <strong>${req.fullname}</strong> (รหัส: ${req.user_id})<br>ได้ทำการยื่นขอโอทีเข้าสู่ระบบค่ะ</p>
+
+    <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f8fafc" style="width: 100%; border: 1px solid #e2e8f0; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; background-color: #f8fafc;">
+      <tr>
+        <td width="32%" valign="top" style="width: 32%; padding: 14px 14px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; font-weight: 700; color: #334155;">วันที่ขอ</td>
+        <td valign="top" style="padding: 14px 14px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; color: #475569;">${req.date}</td>
+      </tr>
+      <tr>
+        <td width="32%" valign="top" style="width: 32%; padding: 14px 14px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; font-weight: 700; color: #334155;">รหัสคำขอ</td>
+        <td valign="top" style="padding: 14px 14px; border-bottom: 1px solid #e2e8f0; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; color: #475569;">${req.id}</td>
+      </tr>
+      <tr>
+        <td width="32%" valign="top" style="width: 32%; padding: 14px 14px; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; font-weight: 700; color: #334155;">เหตุผล</td>
+        <td valign="top" style="padding: 14px 14px; font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 23px; mso-line-height-rule: exactly; color: #475569;">${req.description || '-'}</td>
+      </tr>
+    </table>
+
+    <p style="margin: 24px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
+      เวลาที่ส่งคำขอ: ${new Date().toLocaleString('th-TH')}
+    </p>
   `;
+
+  const htmlBody = buildEmailLayout(
+    '#3b82f6',
+    '⚠️ คำขอโอทีใหม่เข้าระบบ',
+    contentHtml,
+    560
+  );
 
   MailApp.sendEmail({
     to: CONFIG.REQ_TARGET_EMAIL,
