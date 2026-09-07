@@ -13,10 +13,22 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260901-3` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260907-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
 
 ---
+
+## 🆕 แก้ Workflow ผู้อนุมัติไม่ครบ 3 Step และซ่อม OTR-2390 — Deploy 07/09/2026
+
+* สาเหตุของ OTR-2390 คือ Race condition: แบบฟอร์มแก้ไขถูกเปิดก่อน Step 1 อนุมัติ แต่บันทึกหลังอนุมัติ ทำให้ Client เดิมลบเฉพาะ Step 2–3 ที่ยัง `Pending` และเหลือ Step 1 ที่ `Approved` เพียงรายการเดียว
+* `app.js` เปลี่ยนการสร้าง/แก้คำขอเป็น RPC `oms_save_pending_ot_request` และการอนุมัติรายรายการ/แบบกลุ่มเป็น RPC `oms_review_steps` เพื่อให้การเขียนหลายตารางอยู่ใน Transaction เดียว
+* Migration `security/011_atomic_ot_workflow.sql` ล็อกคำขอก่อนแก้หรืออนุมัติ, บังคับผู้อนุมัติ 3 คนไม่ซ้ำกัน, ป้องกันการลบ Step อนาคตเมื่อ Workflow เริ่มแล้ว และห้ามปิดคำขอเป็น `Approved` หาก Step 1–3 ไม่ครบและไม่อนุมัติครบ
+* Repair `security/012_repair_otr_2390.sql` เพิ่มเฉพาะ Step 2–3 ที่หาย โดยยืนยันเงื่อนไข OTR-2390 และอนุมานเส้นทางจาก OTR-2393 กับ OTR-2404 ที่ตรงกัน; ไม่มีคำสั่งลบข้อมูล
+* รัน Migration และ Repair บน Production Supabase `hperamyypofcxajmrskq` สำเร็จผ่าน SQL Editor วันที่ 07/09/2026
+* ผล Query หลังซ่อม: OTR-2390 สถานะ `Pending`, มี 3 Step / 3 ผู้อนุมัติไม่ซ้ำ, ลำดับ `[1,2,3]`, สถานะ `[Approved, Pending, Pending]`; ผู้อนุมัติตามลำดับคือ วุฒิพงษ์ ริมกระจ่าง, ธีรยุทธ ภูชฎาภิรมย์ และศิวพร อนันตะสุข
+* ตรวจ Production Database เพิ่มเติม: RPC ติดตั้งครบ 2 ตัว (`true`, `true`) และ Guard trigger เปิดใช้งานครบ 3 ตัว
+* ชุดตรวจ Local ผ่าน: `node --check app.js`, Apps Script syntax, `git diff --check` และ `node --test tests/ot-workflow.test.js` 4/4
+* Commit หลัก `5cbce61` Push ขึ้น `main`; GitHub Pages Run `34102536142` สำเร็จ และตรวจ Production ได้ HTTP 200, `app.js?v=20260907-1`, Save RPC 1 จุด และ Review RPC 2 จุด
 
 ## 🆕 อีเมล OMS รองรับ Outlook และมือถือ — Deploy 07/09/2026
 
@@ -31,7 +43,7 @@
 * พี่ต้นส่งภาพ Classic Outlook ของ v6 และยืนยันว่าสวย; หลัง v7 พี่ต้นยืนยันมุมมองมือถือว่า “ok สวยงาม” ถือเป็นการยอมรับรูปแบบจากผู้ใช้ ไม่ใช่การทดสอบทุก Mail client/ทุกอุปกรณ์โดยอัตโนมัติ
 * อีเมลเก่าจะไม่เปลี่ยนหน้าตา ต้องเปิดฉบับส่งใหม่; รักษารูปแบบที่ผู้ใช้ยอมรับนี้ในการแก้ครั้งต่อไป
 * `clasp` เชื่อมบัญชี `smetaltech25@gmail.com` แล้ว; เปิด Apps Script API ชั่วคราวเพื่อ Deploy และตรวจปิดคืนหลัง v6/v7 เรียบร้อย
-* งานนี้ Deploy Google Apps Script แล้ว แต่ยังไม่ได้ Commit/Push ไฟล์ Local เข้า GitHub; สำเนาทำงาน v7 อยู่ `outputs/oms-mobile-deploy`
+* งานนี้ Deploy Google Apps Script แล้ว และ Commit/Push Source เข้า GitHub ใน Commit `5cbce61`; สำเนาทำงาน v7 อยู่ `outputs/oms-mobile-deploy`
 
 ## 🆕 อัปเดตโดยจ๊ะ: Active Menu โหมดสว่าง Deploy วันที่ 01/09/2026
 
