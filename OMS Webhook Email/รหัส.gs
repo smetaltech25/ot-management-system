@@ -3,6 +3,9 @@
 // =================================================================
 
 const CONFIG = {
+  // URL สำหรับเปิดเข้าสู่ระบบ OMS
+  APP_URL: 'https://smetaltech25.github.io/ot-management-system/',
+
   // 1. ตั้งค่าอีเมลสำหรับแจ้งเตือนตอน "อนุมัติ" (รับข้อมูลเป็นกลุ่มได้)
   EMAIL_MAP: {
     'USER-006': 'pongsak@smetaltech.co.th',
@@ -18,6 +21,23 @@ const CONFIG = {
 // ใช้ฟอนต์ที่มีติดมากับ Windows/Outlook และกำหนด Style แบบ Inline
 // เพราะ Classic Outlook ใช้ Microsoft Word ในการแสดงผล HTML Email
 const EMAIL_FONT_STACK = "Tahoma, Arial, sans-serif";
+
+function buildAppButtonHtml(buttonText, buttonBgColor) {
+  const label = buttonText || '👉 คลิกที่นี่เพื่อเปิดเข้าสู่ระบบ OMS';
+  const bgColor = buttonBgColor || '#10b981';
+
+  return `
+    <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin: 20px 0 8px 0; border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+      <tr>
+        <td class="oms-btn-cell" align="center" bgcolor="${bgColor}" style="border-radius: 8px; background-color: ${bgColor}; padding: 13px 20px; text-align: center;">
+          <a class="oms-btn-link" href="${CONFIG.APP_URL}" target="_blank" style="font-family: ${EMAIL_FONT_STACK}; font-size: 15px; line-height: 22px; mso-line-height-rule: exactly; font-weight: 700; color: #ffffff; text-decoration: none; display: block;">
+            ${label}
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+}
 
 function buildEmailLayout(headerColor, headerText, contentHtml, maxWidth) {
   const safeWidth = maxWidth || 680;
@@ -37,6 +57,8 @@ function buildEmailLayout(headerColor, headerText, contentHtml, maxWidth) {
             .oms-content th { padding: 10px 3px !important; font-size: 11px !important; line-height: 18px !important; white-space: nowrap !important; }
             .oms-content td { padding: 10px 3px !important; font-size: 12px !important; line-height: 19px !important; }
             .oms-content td span { font-size: 10px !important; line-height: 16px !important; overflow-wrap: anywhere; }
+            .oms-btn-cell { padding: 12px 10px !important; }
+            .oms-btn-link { font-size: 14px !important; line-height: 20px !important; }
           }
         </style>
       </head>
@@ -155,7 +177,9 @@ function processBulkApprove(records) {
         ${tableRows}
       </table>
 
-      <p style="margin: 24px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
+      ${buildAppButtonHtml('👉 คลิกที่นี่เพื่อเปิดเข้าสู่ระบบ OMS', '#10b981')}
+
+      <p style="margin: 20px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
         ส่งอัตโนมัติโดย OMS Auto Agent<br>${new Date().toLocaleString('th-TH')}
       </p>
     `;
@@ -201,7 +225,9 @@ function processNewRequest(req) {
       </tr>
     </table>
 
-    <p style="margin: 24px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
+    ${buildAppButtonHtml('👉 คลิกที่นี่เพื่อเปิดเข้าสู่ระบบ OMS', '#10b981')}
+
+    <p style="margin: 20px 0 0 0; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 20px; mso-line-height-rule: exactly; color: #64748b; text-align: center;">
       เวลาที่ส่งคำขอ: ${new Date().toLocaleString('th-TH')}
     </p>
   `;
