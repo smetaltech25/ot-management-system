@@ -18,6 +18,17 @@
 
 ---
 
+## 🆕 เพิ่มแถบปุ่มเปิดแอป OMS สีเขียวในอีเมลทุก Step (Version 8) — Deploy 07/09/2026
+
+* เพิ่มปุ่ม Call-to-Action ในอีเมลสำหรับเปิดแอป OMS: ลิงก์ตรงไปที่ `https://smetaltech25.github.io/ot-management-system/`
+* ปรับแต่งสีปุ่มเป็นสีเขียว `#10b981` ตรงกับสีแถบหัวข้ออีเมลตามที่พี่ต้นเลือก พร้อมข้อความ "👉 คลิกที่นี่เพื่อเปิดเข้าสู่ระบบ OMS"
+* ออกแบบด้วยโครงสร้าง Table + Inline CSS เพื่อรองรับ Classic Outlook (Word rendering engine) สีพื้นหลังและข้อความแสดงผลสวยงาม ไม่เพี้ยน
+* เพิ่มคลาส `.oms-btn-cell` และ `.oms-btn-link` ใน Media Query รองรับหน้าจอมือถือ (<= 480px)
+* ใส่แถบปุ่มนี้ใต้ตารางและเหนือเส้นประแจ้งเตือน Auto Agent ครอบคลุมทั้งอีเมลอนุมัติทุก Step (`processBulkApprove`) และอีเมลแจ้งเตือนคำขอใหม่ (`processNewRequest`)
+* อัปเดตไฟล์ `OMS Webhook Email/รหัส.gs` และ `outputs/oms-mobile-deploy/รหัส.js`
+* Deploy ผ่าน `clasp` ไปยัง Deployment ID เดิม `AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw` เป็น Version 8 (@8); URL Webhook ใน `app.js` คงเดิม
+* ทดสอบยิง Live Webhook สำเร็จ ได้รับ `{ status: 'success', message: 'Email sent successfully!' }`
+
 ## 🆕 แก้ Workflow ผู้อนุมัติไม่ครบ 3 Step และซ่อม OTR-2390 — Deploy 07/09/2026
 
 * สาเหตุของ OTR-2390 คือ Race condition: แบบฟอร์มแก้ไขถูกเปิดก่อน Step 1 อนุมัติ แต่บันทึกหลังอนุมัติ ทำให้ Client เดิมลบเฉพาะ Step 2–3 ที่ยัง `Pending` และเหลือ Step 1 ที่ `Approved` เพียงรายการเดียว
