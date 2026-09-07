@@ -28,6 +28,7 @@
 * อัปเดตไฟล์ `OMS Webhook Email/รหัส.gs` และ `outputs/oms-mobile-deploy/รหัส.js`
 * Deploy ผ่าน `clasp` ไปยัง Deployment ID เดิม `AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw` เป็น Version 8 (@8); URL Webhook ใน `app.js` คงเดิม
 * ทดสอบยิง Live Webhook สำเร็จ ได้รับ `{ status: 'success', message: 'Email sent successfully!' }`
+* ส่งอีเมลทดสอบจริงไปยัง `pongsak@smetaltech.co.th` และพี่ต้นตรวจสอบบน Microsoft Classic Outlook ยืนยันว่า “ok สวยงาม” ถือเป็นการยอมรับผลงานเรียบร้อยแล้ว
 
 ## 🆕 แก้ Workflow ผู้อนุมัติไม่ครบ 3 Step และซ่อม OTR-2390 — Deploy 07/09/2026
 
