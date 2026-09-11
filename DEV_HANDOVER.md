@@ -18,6 +18,15 @@
 
 ---
 
+## 🆕 เปลี่ยนชื่อผู้ส่งอีเมลแจ้งเตือนทุก Step เป็น Overtime Management System (Version 9) — Deploy 11/09/2026
+
+* ปรับปรุงชื่อผู้ส่งอีเมล (Sender Display Name) ของระบบแจ้งเตือน OT ทุก Step จากเดิมที่แสดงเป็น `smetaltech25@gmail.com` ให้แสดงเป็น **`Overtime Management System`**
+* เพิ่มค่าคอนฟิก `SENDER_NAME: 'Overtime Management System'` ใน `CONFIG`
+* ส่งพารามิเตอร์ `name: CONFIG.SENDER_NAME` ในคำสั่ง `MailApp.sendEmail()` ทั้งส่วนการอนุมัติทุก Step (`processBulkApprove`) และการยื่นคำขอใหม่ (`processNewRequest`)
+* อัปเดตไฟล์ `OMS Webhook Email/รหัส.gs` และ `outputs/oms-mobile-deploy/รหัส.js`
+* Deploy ผ่าน `clasp` ไปยัง Deployment ID เดิม `AKfycbx79QQvGmdpuO8oRSKMn08KdZSYKYZLv9qf6KL-0l55p1EEkKZuZ1glyfGyZt2ma8i7dw` เป็น Version 9 (@9) เรียบร้อยแล้ว
+* ยิงทดสอบอีเมลจริงไปยัง `pongsak@smetaltech.co.th` สำเร็จ
+
 ## 🆕 เพิ่มแถบปุ่มเปิดแอป OMS สีเขียวในอีเมลทุก Step (Version 8) — Deploy 07/09/2026
 
 * เพิ่มปุ่ม Call-to-Action ในอีเมลสำหรับเปิดแอป OMS: ลิงก์ตรงไปที่ `https://smetaltech25.github.io/ot-management-system/`

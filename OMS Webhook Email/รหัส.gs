@@ -3,6 +3,9 @@
 // =================================================================
 
 const CONFIG = {
+  // ชื่อผู้ส่งอีเมลที่แสดงในกล่องข้อความ (ทุก Step)
+  SENDER_NAME: 'Overtime Management System',
+
   // URL สำหรับเปิดเข้าสู่ระบบ OMS
   APP_URL: 'https://smetaltech25.github.io/ot-management-system/',
 
@@ -194,7 +197,8 @@ function processBulkApprove(records) {
     MailApp.sendEmail({
       to: email,
       subject: subject,
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
+      name: CONFIG.SENDER_NAME
     });
   }
 }
@@ -242,6 +246,7 @@ function processNewRequest(req) {
   MailApp.sendEmail({
     to: CONFIG.REQ_TARGET_EMAIL,
     subject: subject,
-    htmlBody: htmlBody
+    htmlBody: htmlBody,
+    name: CONFIG.SENDER_NAME
   });
 }
