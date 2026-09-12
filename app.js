@@ -1411,20 +1411,28 @@ function renderApproversGrid(approvers, container) {
 function confirmApproverSelection() {
     finalSelectedApprovers = [...tempSelectedApprovers];
     closeApproverModal();
-    
+    renderSelectedApproverChips();
+}
+
+function renderSelectedApproverChips() {
     const chipContainer = document.getElementById("selected-approvers");
+    if (!chipContainer) return;
     chipContainer.innerHTML = "";
     
-    if(finalSelectedApprovers.length === 0) {
+    if (finalSelectedApprovers.length === 0) {
         chipContainer.innerHTML = `<span class="text-sm text-slate-400 italic">ยังไม่ได้เลือกผู้อนุมัติ...</span>`;
         return;
     }
 
     finalSelectedApprovers.forEach((u, idx) => {
+        const avatarSrc = getAvatarUrl(u.fullname, u.avatar_url);
         chipContainer.innerHTML += `
-            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
-                <span class="w-5 h-5 bg-amber-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center mr-2">${idx + 1}</span>
-                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 mr-1">${u.fullname}</span>
+            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full pl-1.5 pr-3 py-1 shadow-sm gap-2 hover:border-blue-300 transition-all">
+                <span class="w-5 h-5 bg-amber-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">${idx + 1}</span>
+                <div class="w-6 h-6 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-inner">
+                    <img src="${avatarSrc}" alt="${u.fullname}" class="w-full h-full object-cover">
+                </div>
+                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">${u.fullname}</span>
             </div>
         `;
     });
@@ -2065,7 +2073,8 @@ async function editMyOTRequest(reqId) {
             });
         }, 100);
 
-        confirmApproverSelection(); 
+        tempSelectedApprovers = [...finalSelectedApprovers];
+        renderSelectedApproverChips();
         document.getElementById("otRequestFormModal").classList.remove("hidden"); 
 
     } catch (err) {
