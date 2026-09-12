@@ -160,7 +160,11 @@ function parseOTRequestDate(dateValue) {
     if (!dateValue) return null;
 
     const isoMatch = String(dateValue).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    if (isoMatch) {
+        let year = Number(isoMatch[1]);
+        if (year > 2500) year -= 543;
+        return new Date(year, Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    }
 
     const slashMatch = String(dateValue).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (!slashMatch) return null;
@@ -168,6 +172,75 @@ function parseOTRequestDate(dateValue) {
     let year = Number(slashMatch[3]);
     if (year > 2500) year -= 543;
     return new Date(year, Number(slashMatch[2]) - 1, Number(slashMatch[1]));
+}
+
+function normalizeDateToISO(dateValue) {
+    if (!dateValue) return '';
+    const str = String(dateValue).trim();
+
+    // Match YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (isoMatch) {
+        let year = Number(isoMatch[1]);
+        if (year > 2500) year -= 543;
+        const month = String(Number(isoMatch[2])).padStart(2, '0');
+        const day = String(Number(isoMatch[3])).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Match DD/MM/YYYY or DD-MM-YYYY
+    const slashMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (slashMatch) {
+        let year = Number(slashMatch[3]);
+        if (year > 2500) year -= 543;
+        const month = String(Number(slashMatch[2])).padStart(2, '0');
+        const day = String(Number(slashMatch[1])).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    const parsed = parseOTRequestDate(str);
+    if (parsed && !isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    return str;
+}
+
+function formatThaiLongDate(dateObj) {
+    if (!dateObj || isNaN(dateObj.getTime())) return '';
+    const days = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+    const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+    const dayName = days[dateObj.getDay()];
+    const day = dateObj.getDate();
+    const monthName = months[dateObj.getMonth()];
+    const yearBE = dateObj.getFullYear() + 543;
+    return `วัน${dayName}ที่ ${day} ${monthName} ${yearBE}`;
+}
+
+function updateReqDatePreview() {
+    const input = document.getElementById("reqDateStart");
+    const preview = document.getElementById("reqDateStartPreview");
+    const previewText = document.getElementById("reqDateStartPreviewText");
+    if (!input || !preview || !previewText) return;
+
+    if (!input.value) {
+        preview.classList.add("hidden");
+        previewText.textContent = "";
+        return;
+    }
+
+    const normalized = normalizeDateToISO(input.value);
+    const dateObj = parseOTRequestDate(normalized);
+    if (dateObj && !isNaN(dateObj.getTime())) {
+        previewText.textContent = formatThaiLongDate(dateObj);
+        preview.classList.remove("hidden");
+    } else {
+        preview.classList.add("hidden");
+        previewText.textContent = "";
+    }
 }
 
 function getCurrentOTPeriod(referenceDate = new Date()) {
@@ -1336,7 +1409,8 @@ function confirmApproverSelection() {
 }
 
 async function submitOTRequestSupabase() {
-    const dateStart = document.getElementById("reqDateStart").value;
+    const rawDateStart = document.getElementById("reqDateStart").value;
+    const dateStart = normalizeDateToISO(rawDateStart);
     const otType = document.getElementById("reqOtType").value;
     const description = document.getElementById("reqDescription").value.trim();
     const editId = document.getElementById("reqEditId").value; 
@@ -1346,9 +1420,37 @@ async function submitOTRequestSupabase() {
         return;
     }
 
+    const parsedDate = parseOTRequestDate(dateStart);
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+        Swal.fire('วันที่ไม่ถูกต้อง', 'กรุณาระบุวันที่ทำโอทีให้ถูกต้องนะคะ 😊', 'warning');
+        return;
+    }
+
     if (finalSelectedApprovers.length !== 3) {
         Swal.fire('เลือกผู้อนุมัติไม่ครบ', `⚠️ กรุณาเลือกผู้อนุมัติพิจารณาให้ครบ 3 ลำดับนะคะ (ตอนนี้เลือกไว้เพียง ${finalSelectedApprovers.length} ท่าน)`, 'warning');
         return;
+    }
+
+    // แจ้งเตือนยืนยันหากวันที่ห่างจากปัจจุบันผิดปกติ (> 45 วัน)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(parsedDate);
+    checkDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((checkDate - today) / (1000 * 60 * 60 * 24));
+
+    if (Math.abs(diffDays) > 45) {
+        const thaiDateText = formatThaiLongDate(parsedDate);
+        const confirmDate = await Swal.fire({
+            title: 'โปรดตรวจสอบวันที่ทำโอที',
+            html: `วันที่คุณเลือกคือ <b>${thaiDateText}</b><br><span class="text-sm text-slate-500">(ห่างจากปัจจุบัน ${Math.abs(diffDays)} วัน)</span><br><br>ยืนยันว่าต้องการยื่นขอโอทีสำหรับวันนี้หรือไม่คะ?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#2563eb',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'ใช่, วันที่ถูกต้อง',
+            cancelButtonText: 'แก้ไขวันที่'
+        });
+        if (!confirmDate.isConfirmed) return;
     }
 
     try {
@@ -1466,6 +1568,7 @@ function openRequestFormModal() {
     document.getElementById("reqOtType").value = "";
     document.getElementById("reqDateStart").value = "";
     document.getElementById("reqDescription").value = "";
+    updateReqDatePreview();
     
     // ล้างค่าผู้พิจารณาเดิมทิ้ง
     finalSelectedApprovers = [];
@@ -1926,7 +2029,8 @@ async function editMyOTRequest(reqId) {
         }
 
         document.getElementById("reqEditId").value = reqId; 
-        document.getElementById("reqDateStart").value = reqData.date_start;
+        document.getElementById("reqDateStart").value = normalizeDateToISO(reqData.date_start);
+        updateReqDatePreview();
         document.getElementById("reqDescription").value = reqData.description;
         document.getElementById("reqOtType").value = reqData.ot_type_id;
 
@@ -3377,8 +3481,10 @@ function setReportLoading(isLoading) {
 }
 
 function validateReportFilters(showMessage = false) {
-    const startValue = document.getElementById("reportStartDate")?.value || "";
-    const endValue = document.getElementById("reportEndDate")?.value || "";
+    const rawStart = document.getElementById("reportStartDate")?.value || "";
+    const rawEnd = document.getElementById("reportEndDate")?.value || "";
+    const startValue = normalizeDateToISO(rawStart);
+    const endValue = normalizeDateToISO(rawEnd);
     const messageElement = document.getElementById("reportValidationMessage");
     const searchButton = document.getElementById("reportSearchBtn");
     let message = "";
@@ -4282,11 +4388,18 @@ async function superAdminSaveEditedOT() {
 
     const reqId = document.getElementById('superAdminEditReqId').value;
     const newOtTypeId = document.getElementById('superAdminModalOtType').value;
-    const newDate = document.getElementById('superAdminModalDate').value;
+    const rawDate = document.getElementById('superAdminModalDate').value;
+    const newDate = normalizeDateToISO(rawDate);
     const newDesc = document.getElementById('superAdminModalDesc').value.trim();
 
     if (!reqId || !newOtTypeId || !newDate) {
         Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุประเภทโอทีและวันที่ให้ครบถ้วนค่ะ', 'warning');
+        return;
+    }
+
+    const parsedDate = parseOTRequestDate(newDate);
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+        Swal.fire('วันที่ไม่ถูกต้อง', 'กรุณาระบุวันที่ให้ถูกต้องนะคะ 😊', 'warning');
         return;
     }
 

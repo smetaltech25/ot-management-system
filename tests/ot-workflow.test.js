@@ -34,3 +34,26 @@ test('OTR-2390 repair is guarded and restores only Step 2 and Step 3', () => {
     assert.match(repairSource, /OTR-2390-STEP3/);
     assert.doesNotMatch(repairSource, /delete\s+from/i);
 });
+
+test('date normalization converts Buddhist Era to Christian Era ISO format', () => {
+    const vm = require('node:vm');
+    const sandbox = {};
+    vm.createContext(sandbox);
+    const dateFns = appSource.slice(
+        appSource.indexOf('function parseOTRequestDate'),
+        appSource.indexOf('function formatThaiLongDate')
+    );
+    vm.runInContext(dateFns, sandbox);
+
+    assert.equal(sandbox.normalizeDateToISO('2569-09-07'), '2026-09-07');
+    assert.equal(sandbox.normalizeDateToISO('2026-09-07'), '2026-09-07');
+    assert.equal(sandbox.normalizeDateToISO('07/09/2569'), '2026-09-07');
+    assert.equal(sandbox.normalizeDateToISO('07/09/2026'), '2026-09-07');
+
+    const parsedBE = sandbox.parseOTRequestDate('2569-09-07');
+    assert.equal(parsedBE.getFullYear(), 2026);
+    assert.equal(parsedBE.getMonth(), 8);
+    assert.equal(parsedBE.getDate(), 7);
+
+    assert.match(appSource, /const dateStart = normalizeDateToISO\(rawDateStart\);/);
+});
