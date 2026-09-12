@@ -228,18 +228,40 @@ function updateReqDatePreview() {
 
     if (!input.value) {
         preview.classList.add("hidden");
-        previewText.textContent = "";
+        previewText.innerHTML = "";
         return;
     }
 
     const normalized = normalizeDateToISO(input.value);
     const dateObj = parseOTRequestDate(normalized);
     if (dateObj && !isNaN(dateObj.getTime())) {
-        previewText.textContent = formatThaiLongDate(dateObj);
+        const thaiDate = formatThaiLongDate(dateObj);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const checkDate = new Date(dateObj);
+        checkDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((checkDate - today) / (1000 * 60 * 60 * 24));
+
+        if (Math.abs(diffDays) > 45) {
+            const direction = diffDays > 0 ? `อนาคตอีก ${diffDays} วัน` : `ย้อนหลัง ${Math.abs(diffDays)} วัน`;
+            preview.className = "mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium flex flex-col gap-1 animate-fade-in";
+            previewText.innerHTML = `
+                <div class="flex items-center font-bold text-amber-800 text-sm">
+                    <i class='bx bx-calendar-event mr-1 text-base'></i> ${thaiDate}
+                </div>
+                <div class="flex items-start text-amber-700 font-semibold mt-0.5">
+                    <i class='bx bxs-error-circle mr-1 text-base text-amber-600 shrink-0 mt-0.5'></i>
+                    <span>⚠️ ข้อควรระวัง: วันที่เลือกเป็น${direction} (ห่างจากปัจจุบันเกิน 45 วัน) โปรดตรวจสอบว่าเลือกเดือนถูกต้องหรือไม่นะคะ</span>
+                </div>
+            `;
+        } else {
+            preview.className = "mt-1.5 text-xs font-semibold text-blue-600 flex items-center";
+            previewText.innerHTML = `<i class='bx bx-calendar-event mr-1 text-sm'></i> <span>${thaiDate}</span>`;
+        }
         preview.classList.remove("hidden");
     } else {
         preview.classList.add("hidden");
-        previewText.textContent = "";
+        previewText.innerHTML = "";
     }
 }
 
