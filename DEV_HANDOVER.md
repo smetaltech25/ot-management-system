@@ -2,9 +2,9 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 7 กันยายน 2026
+**อัปเดตล่าสุด:** 12 กันยายน 2026
 
-**ผู้บันทึก:** แอ๊น (Antigravity) และจ๊ะ (Codex) สำหรับพี่ต้น 💖
+**ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
 
 ---
 
@@ -13,8 +13,19 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260907-1` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260912-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 ปรับปรุงระบบ Normalization วันที่ (พ.ศ. -> ค.ศ.), พรีวิววันที่ภาษาไทย และซ่อมคำขอ OTR-2656 ถึง 2659 — Deploy 12/09/2026
+
+* **การซ่อมข้อมูลในฐานข้อมูล:** ตรวจพบคำขอของคุณเจษฎากร ละแสง (`USER-076`) ได้แก่ `OTR-2656` ถึง `OTR-2659` และ `OTR-2499` บันทึก `date_start` ขึ้นต้นด้วยปี พ.ศ. `2569-...` ทำให้ไม่ปรากฏในปฏิทินเดือนกันยายน 2569 ได้ทำการแก้ไข `date_start` ใน Production Supabase เป็น `2026-09-07`, `2026-09-08`, `2026-09-09`, `2026-09-10` ครบถ้วนและแสดงผลบนปฏิทินถูกต้อง 100%
+* **Normalization วันที่ (`normalizeDateToISO`):** ดักจับวันที่ทั้ง ISO และ Slash format หากปี > 2500 จะแปลงลบ 543 เป็นปี ค.ศ. เสมอก่อนบันทึกหรือค้นหา
+* **พรีวิววันที่ภาษาไทย (`updateReqDatePreview`):** แสดงข้อความวันที่ภาษาไทยแบบเต็มใต้ช่องเลือกวันที่ในฟอร์มยื่นคำขอโอที ช่วยให้ผู้ยื่นเห็นชื่อวันและเดือนชัดเจนทันที
+* **Anomaly Guard:** แจ้งเตือนยืนยันก่อนส่งคำขอหากวันที่ห่างจากปัจจุบันเกิน 45 วัน
+* **Cache Busting:** ปรับเวอร์ชันเป็น `app.js?v=20260912-1` ใน `index.html`
+* **Unit Tests:** ทดสอบผ่าน 5/5 ชุดใน `tests/ot-workflow.test.js`
 
 ---
 
