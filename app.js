@@ -1414,16 +1414,34 @@ function confirmApproverSelection() {
     renderSelectedApproverChips();
 }
 
+function getApproverStepLabel(u, idx) {
+    const stepNum = idx + 1;
+    let roleTitle = '';
+    if (u?.role === 'SuperUser') {
+        roleTitle = 'หัวหน้างาน';
+    } else if (u?.role === 'Admin') {
+        roleTitle = 'ผู้จัดการ';
+    } else if (u?.role === 'SuperAdmin') {
+        roleTitle = 'HR';
+    } else {
+        if (stepNum === 1) roleTitle = 'หัวหน้างาน';
+        else if (stepNum === 2) roleTitle = 'ผู้จัดการ';
+        else if (stepNum === 3) roleTitle = 'HR';
+        else roleTitle = u?.role || 'ผู้อนุมัติ';
+    }
+    return `Step ${stepNum} (${roleTitle})`;
+}
+
 function previewApproverPhoto(fullname, avatarUrl, role) {
     if (typeof Swal === 'undefined') return;
     const safeName = String(fullname || 'ผู้อนุมัติ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeRole = role ? String(role).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
     Swal.fire({
         title: safeName,
-        text: safeRole ? `บทบาท: ${safeRole}` : '',
+        text: safeRole ? safeRole : '',
         imageUrl: avatarUrl,
-        imageWidth: 160,
-        imageHeight: 160,
+        imageWidth: 180,
+        imageHeight: 180,
         imageAlt: safeName,
         customClass: {
             image: 'rounded-full object-cover border-4 border-slate-100 shadow-md mx-auto my-2'
@@ -1445,15 +1463,19 @@ function renderSelectedApproverChips() {
 
     finalSelectedApprovers.forEach((u, idx) => {
         const avatarSrc = getAvatarUrl(u.fullname, u.avatar_url);
+        const stepLabel = getApproverStepLabel(u, idx);
         const escapedName = (u.fullname || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const escapedRole = (u.role || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const escapedRole = stepLabel.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
         chipContainer.innerHTML += `
-            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full pl-2 pr-3.5 py-1.5 shadow-sm gap-2.5 hover:border-blue-300 hover:shadow transition-all" title="${u.fullname} (ผู้อนุมัติลำดับที่ ${idx + 1})">
-                <span class="w-6 h-6 bg-amber-500 text-white rounded-full text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">${idx + 1}</span>
-                <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-sm cursor-pointer hover:opacity-90 transition-opacity" onclick="event.stopPropagation(); previewApproverPhoto('${escapedName}', '${avatarSrc}', '${escapedRole}')" title="คลิกเพื่อดูรูปขยาย">
+            <div class="selected-approver-card flex items-center bg-white dark:bg-[#2a2d3e] border border-slate-200/90 dark:border-slate-700 rounded-2xl p-3 sm:p-3.5 shadow-sm gap-3.5 sm:gap-4 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow transition-all w-full">
+                <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 border-2 border-white dark:border-slate-600 ring-1 ring-slate-200 dark:ring-slate-700 shrink-0 shadow-sm cursor-pointer hover:opacity-90 transition-opacity" onclick="event.stopPropagation(); previewApproverPhoto('${escapedName}', '${avatarSrc}', '${escapedRole}')" title="คลิกเพื่อดูรูปขยาย">
                     <img src="${avatarSrc}" alt="${u.fullname}" class="w-full h-full object-cover object-top" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent((u.fullname || 'U').charAt(0))}&background=f1f5f9&color=64748b&size=128'">
                 </div>
-                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 truncate max-w-[130px] sm:max-w-[180px]">${u.fullname}</span>
+                <div class="flex flex-col justify-center min-w-0 flex-1">
+                    <h4 class="selected-approver-name font-bold text-slate-800 dark:text-slate-100 text-base sm:text-lg leading-snug truncate">${u.fullname}</h4>
+                    <p class="selected-approver-step text-sm sm:text-base font-semibold text-slate-500 dark:text-slate-400 mt-0.5">${stepLabel}</p>
+                </div>
             </div>
         `;
     });
