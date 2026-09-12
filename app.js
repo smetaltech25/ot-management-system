@@ -49,8 +49,8 @@ function setApprovalPendingBadge(count) {
     const hasPendingItems = normalizedCount > 0;
     const displayCount = normalizedCount > 99 ? '99+' : String(normalizedCount);
     const accessibleLabel = hasPendingItems
-        ? `การขออนุญาต มี ${normalizedCount} รายการรออนุมัติ`
-        : 'การขออนุญาต';
+        ? `การขอโอที มี ${normalizedCount} รายการรออนุมัติ`
+        : 'การขอโอที';
 
     badge.textContent = displayCount;
     badge.setAttribute('aria-label', hasPendingItems
@@ -473,7 +473,7 @@ function changePage(pageNumber) {
     
     const titles = { 
         1: "หน้าแรก (สรุปสถิติโอที)", 
-        2: "รายการขออนุญาต OT", 
+        2: "รายการขอโอที OT", 
         3: "ปฏิทินตารางเวลา OT", 
         5: "รายงานการทำ OT",
         6: "ผู้ใช้งานระบบ",
