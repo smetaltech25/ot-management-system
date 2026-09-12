@@ -1414,6 +1414,25 @@ function confirmApproverSelection() {
     renderSelectedApproverChips();
 }
 
+function previewApproverPhoto(fullname, avatarUrl, role) {
+    if (typeof Swal === 'undefined') return;
+    const safeName = String(fullname || 'ผู้อนุมัติ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeRole = role ? String(role).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+    Swal.fire({
+        title: safeName,
+        text: safeRole ? `บทบาท: ${safeRole}` : '',
+        imageUrl: avatarUrl,
+        imageWidth: 160,
+        imageHeight: 160,
+        imageAlt: safeName,
+        customClass: {
+            image: 'rounded-full object-cover border-4 border-slate-100 shadow-md mx-auto my-2'
+        },
+        confirmButtonText: 'ปิด',
+        confirmButtonColor: '#3b82f6'
+    });
+}
+
 function renderSelectedApproverChips() {
     const chipContainer = document.getElementById("selected-approvers");
     if (!chipContainer) return;
@@ -1426,13 +1445,15 @@ function renderSelectedApproverChips() {
 
     finalSelectedApprovers.forEach((u, idx) => {
         const avatarSrc = getAvatarUrl(u.fullname, u.avatar_url);
+        const escapedName = (u.fullname || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const escapedRole = (u.role || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         chipContainer.innerHTML += `
-            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full pl-1.5 pr-3 py-1 shadow-sm gap-2 hover:border-blue-300 transition-all">
-                <span class="w-5 h-5 bg-amber-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">${idx + 1}</span>
-                <div class="w-6 h-6 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-inner">
-                    <img src="${avatarSrc}" alt="${u.fullname}" class="w-full h-full object-cover">
+            <div class="selected-approver-chip flex items-center bg-white border border-slate-200 rounded-full pl-2 pr-3.5 py-1.5 shadow-sm gap-2.5 hover:border-blue-300 hover:shadow transition-all" title="${u.fullname} (ผู้อนุมัติลำดับที่ ${idx + 1})">
+                <span class="w-6 h-6 bg-amber-500 text-white rounded-full text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">${idx + 1}</span>
+                <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-sm cursor-pointer hover:opacity-90 transition-opacity" onclick="event.stopPropagation(); previewApproverPhoto('${escapedName}', '${avatarSrc}', '${escapedRole}')" title="คลิกเพื่อดูรูปขยาย">
+                    <img src="${avatarSrc}" alt="${u.fullname}" class="w-full h-full object-cover object-top" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent((u.fullname || 'U').charAt(0))}&background=f1f5f9&color=64748b&size=128'">
                 </div>
-                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">${u.fullname}</span>
+                <span class="selected-approver-chip-name text-sm font-semibold text-slate-700 truncate max-w-[130px] sm:max-w-[180px]">${u.fullname}</span>
             </div>
         `;
     });
