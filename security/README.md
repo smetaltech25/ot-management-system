@@ -17,6 +17,7 @@
 - ล้าง Password Legacy ใน `public.users.password` เป็น `NULL` และให้ Supabase Auth เป็นแหล่ง Credential เดียว; Edge Function จะไม่เขียน Password ลง Profile อีก
 - เพิ่ม Policy `ot_requests_superadmin_delete_processed`: เฉพาะ Active `SuperAdmin` ลบคำขอที่เป็น `Approved`/`Rejected` ได้ ส่วน Role อื่นยังลบรายการที่ดำเนินการแล้วไม่ได้
 - เพิ่ม RPC `oms_superadmin_update_processed_ot` และ `oms_superadmin_reset_processed_ot`: เฉพาะ Active `SuperAdmin` แก้รายการที่ดำเนินการแล้วหรือดึงกลับเป็น Pending ที่ Step 1 แบบ Transaction ได้
+- เพิ่ม Policy `ot_requests_superadmin_delete_any` (`013_superadmin_delete_any_ot.sql`): อนุญาตให้เฉพาะ Active `SuperAdmin` ลบคำขอ OT ได้ทุกสถานะเพื่อรองรับการเคลียร์ข้อมูลจากเมนูรายงาน (OT Reports)
 
 ## สถานะ Staging (18/08/2026)
 
@@ -67,6 +68,7 @@
 8. รัน `008_null_legacy_passwords.sql` เพื่อให้ `public.users.password` รับค่า `NULL` และล้าง Plaintext Legacy โดยไม่เปลี่ยน Credential ใน Supabase Auth
 9. รัน `009_superadmin_delete_processed_ot.sql` เพื่อให้เฉพาะ SuperAdmin ลบรายการ `Approved`/`Rejected` จากเมนูดำเนินการแล้วได้
 10. รัน `010_superadmin_processed_ot_actions.sql` เพื่อให้การแก้และดึงกลับรายการที่ดำเนินการแล้วเป็น Transaction และตรวจสิทธิ์ SuperAdmin ที่ Database
+11. รัน `013_superadmin_delete_any_ot.sql` เพื่อให้เฉพาะ SuperAdmin สามารถลบคำขอ OT ได้ทุกสถานะ (Pending, Approved, Rejected) เพื่อรองรับการเคลียร์ข้อมูลในเมนูรายงาน (OT Reports)
 
 > ห้ามนำ Secret/Service Role key ใส่ `config.js` หรือไฟล์ Frontend โดยเด็ดขาด ให้เก็บเฉพาะใน Supabase Edge Function Secrets
 

@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 12 กันยายน 2026
+**อัปเดตล่าสุด:** 22 กันยายน 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
 
@@ -13,8 +13,33 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260912-1` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20260922-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 เพิ่ม Checkbox และฟังก์ชันลบ/เคลียร์ข้อมูลในเมนูรายงาน (OT Reports) สำหรับ SuperAdmin — Deploy 22/09/2026
+
+* **ความต้องการ:** เพิ่มความสามารถในการเคลียร์ข้อมูลคำขอ OT ในเมนูรายงาน (Page 5) เฉพาะเมื่อผู้ใช้เข้าสู่ระบบด้วยสิทธิ์ `SuperAdmin` เท่านั้น โดยสามารถเลือกติ๊กหน้ารายการเพื่อลบทีละรายการ หรือเลือกทั้งหมดเพื่อลบเป็นชุดได้
+* **การปรับปรุงหน้าจอ (UI) ใน `index.html`:**
+  * **ปุ่มลบรายการที่เลือก (`#reportDeleteSelectedBtn`):** เพิ่มปุ่มสีแดงข้างปุ่ม Export (.xlsx) แสดงเฉพาะสิทธิ์ SuperAdmin และเปิดใช้งานเมื่อมีรายการถูกติ๊กเลือก พร้อมแสดงจำนวนแถวที่เลือกแบบไดนามิก เช่น `ลบรายการที่เลือก (5)`
+  * **Checkbox หัวตาราง (`#reportSelectAllTh`):** เพิ่มช่อง Checkbox ตัวแม่สำหรับสั่ง "เลือกทั้งหมด (Select All)" หรือยกเลิกทั้งหมดในคลิกเดียว
+  * **Dynamic Colspan:** ปรับ colspan ของข้อความ Empty/Loading ในตารางเป็น 13 สำหรับ SuperAdmin และ 12 สำหรับ Role อื่น
+* **การปรับปรุงฟังก์ชัน (Logic) ใน `app.js`:**
+  * ตรวจสอบสิทธิ์ `currentUser?.role === 'SuperAdmin'` เพื่อแสดง Checkbox ในเซลล์แรกของแต่ละแถว และปุ่มถังขยะสีแดงในคอลัมน์ "จัดการ"
+  * เพิ่มฟังก์ชัน `toggleAllReportCheckboxes`, `onReportCheckboxChange`, และ `updateReportDeleteBtnState` เพื่อคุมสถานะการเลือก
+  * เพิ่มฟังก์ชัน `deleteSingleReportRequest` สำหรับลบทีละรายการจากคอลัมน์จัดการ
+  * เพิ่มฟังก์ชัน `deleteSelectedReportRequests` และ `executeDeleteReportRequests` สำหรับลบแบบชุด โดยใช้เทคนิค Batch Chunking (รอบละ 50 รายการ) เพื่อป้องกัน URL Length Limit / Network Timeout
+  * มีระบบ Double Confirmation ด้วย SweetAlert2 แจ้งเตือนยืนยันจำนวนรายการก่อนลบอย่างปลอดภัย
+  * ล้างแคช (`invalidateOTDerivedViews`, `refreshApprovalPendingBadge`) และดึงข้อมูลรายงานใหม่ทันที ตัวเลขสรุปสะสมด้านบนจะอัปเดตตรงตามจริงเรียลไทม์
+* **นโยบายความปลอดภัยและฐานข้อมูล (`security/013_superadmin_delete_any_ot.sql`):**
+  * เพิ่ม RLS Policy `ot_requests_superadmin_delete_any` เพื่ออนุญาตให้เฉพาะสิทธิ์ `SuperAdmin` สามารถลบคำขอ OT ได้ทุกสถานะ (`Pending`, `Approved`, `Rejected`) เพื่อรองรับการเคลียร์ข้อมูลในรายงาน
+* **ความปลอดภัยของผู้ใช้ทั่วไป:** ผู้ใช้ระดับ User, SuperUser และ Admin จะไม่เห็น Checkbox หรือปุ่มลบใด ๆ ตารางจะคงรูปแบบการใช้งานเดิม 100%
+* **การทดสอบและการ Deploy:**
+  * Unit Tests ใน `tests/ot-workflow.test.js` ผ่านครบ 6/6 รายการ
+  * ทดสอบบน Localhost ผ่านเรียบร้อย และพี่ต้นตรวจสอบแล้วยืนยันว่าใช้งานได้จริง
+  * Commit: `0068ad0` — `Add SuperAdmin bulk delete and checkbox features in OT reports`
+  * Cache Busting: `app.js?v=20260922-1`
 
 ---
 
