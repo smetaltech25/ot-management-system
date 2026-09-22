@@ -57,3 +57,26 @@ test('date normalization converts Buddhist Era to Christian Era ISO format', () 
 
     assert.match(appSource, /const dateStart = normalizeDateToISO\(rawDateStart\);/);
 });
+
+test('SuperAdmin report bulk and single delete features are properly implemented', () => {
+    const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    const sql013Source = fs.readFileSync(path.join(root, 'security', '013_superadmin_delete_any_ot.sql'), 'utf8');
+
+    // UI elements in HTML
+    assert.match(htmlSource, /id="reportDeleteSelectedBtn"/);
+    assert.match(htmlSource, /id="reportSelectAllTh"/);
+    assert.match(htmlSource, /id="reportSelectAllCheckbox"/);
+
+    // SuperAdmin security check in app.js
+    assert.match(appSource, /function toggleAllReportCheckboxes/);
+    assert.match(appSource, /function onReportCheckboxChange/);
+    assert.match(appSource, /function updateReportDeleteBtnState/);
+    assert.match(appSource, /function deleteSingleReportRequest/);
+    assert.match(appSource, /function deleteSelectedReportRequests/);
+    assert.match(appSource, /function executeDeleteReportRequests/);
+    assert.match(appSource, /currentUser\?\.role !== 'SuperAdmin'/);
+
+    // SQL 013 policy
+    assert.match(sql013Source, /create policy ot_requests_superadmin_delete_any/);
+    assert.match(sql013Source, /public\.oms_role\(\) = 'SuperAdmin'/);
+});

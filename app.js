@@ -9,6 +9,11 @@ function updateRoleSpecificUI(role) {
     if (adminMenu) adminMenu.style.display = isSuperAdmin ? "block" : "none";
     if (approvalTabContainer) approvalTabContainer.style.display = isSuperAdmin ? "flex" : "none";
 
+    const reportSelectAllTh = document.getElementById("reportSelectAllTh");
+    const reportDeleteSelectedBtn = document.getElementById("reportDeleteSelectedBtn");
+    if (reportSelectAllTh) reportSelectAllTh.style.display = isSuperAdmin ? "" : "none";
+    if (reportDeleteSelectedBtn) reportDeleteSelectedBtn.style.display = isSuperAdmin ? "inline-flex" : "none";
+
     if (role === 'User') {
         if (menuTab2) menuTab2.style.display = "none";
         if (menuTab5) menuTab5.style.display = "none";
@@ -3538,7 +3543,9 @@ function setReportSummary(total = 0, approved = 0, hours = 0) {
 function setReportTableMessage(message, colorClass = "text-slate-400") {
     const tbody = document.getElementById("reportsTableBody");
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="12" class="p-10 text-center ${colorClass}">${message}</td></tr>`;
+    const isSuperAdmin = (currentUser?.role === 'SuperAdmin');
+    const colSpan = isSuperAdmin ? 13 : 12;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="p-10 text-center ${colorClass}">${message}</td></tr>`;
 }
 
 function setReportLoading(isLoading) {
@@ -3651,6 +3658,13 @@ async function loadReportDepartments() {
 }
 
 function initializeReportsPage() {
+    const isSuperAdmin = (currentUser?.role === 'SuperAdmin');
+    const reportSelectAllTh = document.getElementById("reportSelectAllTh");
+    const reportDeleteSelectedBtn = document.getElementById("reportDeleteSelectedBtn");
+    if (reportSelectAllTh) reportSelectAllTh.style.display = isSuperAdmin ? "" : "none";
+    if (reportDeleteSelectedBtn) reportDeleteSelectedBtn.style.display = isSuperAdmin ? "inline-flex" : "none";
+    updateReportDeleteBtnState();
+
     const today = new Date();
     const startInput = document.getElementById("reportStartDate");
     const endInput = document.getElementById("reportEndDate");
@@ -3786,6 +3800,16 @@ async function loadReportsData() {
 
 function renderReportsTable(data) {
     const tbody = document.getElementById("reportsTableBody");
+    const isSuperAdmin = (currentUser?.role === 'SuperAdmin');
+    const selectAllTh = document.getElementById("reportSelectAllTh");
+    const deleteBtn = document.getElementById("reportDeleteSelectedBtn");
+    const selectAllCb = document.getElementById("reportSelectAllCheckbox");
+
+    if (selectAllTh) selectAllTh.style.display = isSuperAdmin ? "" : "none";
+    if (deleteBtn) deleteBtn.style.display = isSuperAdmin ? "inline-flex" : "none";
+    if (selectAllCb) selectAllCb.checked = false;
+    updateReportDeleteBtnState();
+
     let totalApproved = 0;
     let totalHours = 0;
 
@@ -3808,9 +3832,22 @@ function renderReportsTable(data) {
                 const d = showDate.split('-');
                 showDate = `${d[2]}/${d[1]}/${d[0]}`; 
             }
+
+            const checkboxCell = isSuperAdmin
+                ? `<td class="p-3 text-center">
+                    <input type="checkbox" class="reportRowCheckbox w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 cursor-pointer" value="${req.id}" data-status="${req.status}" onchange="onReportCheckboxChange()">
+                   </td>`
+                : '';
+
+            const deleteActionBtn = isSuperAdmin
+                ? `<button onclick="deleteSingleReportRequest('${req.id}')" class="dashboard-action-btn dashboard-btn-red w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm" title="ลบรายการนี้">
+                    <i class='bx bx-trash text-lg'></i>
+                   </button>`
+                : '';
             
             return `
                 <tr class="report-table-row hover:bg-slate-50 transition-colors">
+                    ${checkboxCell}
                     <td class="p-3 text-center text-slate-600">${showDate}</td>
                     <td class="p-3 text-center font-bold text-slate-700">${req.id}</td>
                     <td class="p-3">
@@ -3832,9 +3869,12 @@ function renderReportsTable(data) {
                     <td class="p-3 text-center font-bold text-blue-600">${req.hours.toFixed(2)}</td>
                     <td class="p-3 text-center">${badgeHTML}</td>
                     <td class="p-3 text-center">
-                        <button onclick="openOTDetailModal('${req.id}')" class="dashboard-action-btn dashboard-btn-blue w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm mx-auto" title="ดูรายละเอียด">
-                            <i class='bx bx-show text-lg'></i>
-                        </button>
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="openOTDetailModal('${req.id}')" class="dashboard-action-btn dashboard-btn-blue w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm" title="ดูรายละเอียด">
+                                <i class='bx bx-show text-lg'></i>
+                            </button>
+                            ${deleteActionBtn}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -3889,6 +3929,157 @@ function exportToExcel() {
     const fileName = `OT_Report_${start}_to_${end}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
+}
+
+// ===================================================
+// ฟังก์ชันจัดการ Checkbox และการลบ/เคลียร์ข้อมูลรายงานสำหรับ SuperAdmin
+// ===================================================
+
+function toggleAllReportCheckboxes(source) {
+    if (currentUser?.role !== 'SuperAdmin') return;
+    const checkboxes = document.querySelectorAll('.reportRowCheckbox');
+    checkboxes.forEach(cb => {
+        cb.checked = source.checked;
+    });
+    updateReportDeleteBtnState();
+}
+
+function onReportCheckboxChange() {
+    if (currentUser?.role !== 'SuperAdmin') return;
+    const allCbs = document.querySelectorAll('.reportRowCheckbox');
+    const checkedCbs = document.querySelectorAll('.reportRowCheckbox:checked');
+    const selectAllCb = document.getElementById('reportSelectAllCheckbox');
+    if (selectAllCb) {
+        selectAllCb.checked = (allCbs.length > 0 && allCbs.length === checkedCbs.length);
+    }
+    updateReportDeleteBtnState();
+}
+
+function updateReportDeleteBtnState() {
+    const isSuperAdmin = (currentUser?.role === 'SuperAdmin');
+    const deleteBtn = document.getElementById('reportDeleteSelectedBtn');
+    const deleteBtnText = document.getElementById('reportDeleteSelectedBtnText');
+    if (!deleteBtn) return;
+
+    if (!isSuperAdmin) {
+        deleteBtn.style.display = 'none';
+        return;
+    }
+
+    deleteBtn.style.display = 'inline-flex';
+    const checkedCount = document.querySelectorAll('.reportRowCheckbox:checked').length;
+    if (checkedCount > 0) {
+        deleteBtn.disabled = false;
+        if (deleteBtnText) deleteBtnText.innerText = `ลบรายการที่เลือก (${checkedCount})`;
+    } else {
+        deleteBtn.disabled = true;
+        if (deleteBtnText) deleteBtnText.innerText = 'ลบรายการที่เลือก';
+    }
+}
+
+async function deleteSingleReportRequest(reqId) {
+    if (currentUser?.role !== 'SuperAdmin') {
+        Swal.fire('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะ SuperAdmin เท่านั้นที่สามารถลบรายการได้ค่ะ 😅', 'error');
+        return;
+    }
+
+    const reqInfo = (allReportData || []).find(r => r.id === reqId) || {};
+    const empName = reqInfo.fullname ? `\nพนักงาน: ${reqInfo.fullname}` : '';
+    const dateText = reqInfo.date_start ? `\nวันที่: ${reqInfo.date_start}` : '';
+
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบรายการ?',
+        text: `ต้องการลบคำขอโอทีรหัส ${reqId}${empName}${dateText} ใช่ไหมคะ?\n⚠️ ข้อมูลจะถูกลบออกจากระบบอย่างถาวรและไม่สามารถกู้คืนได้ค่ะ`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+        await executeDeleteReportRequests([reqId]);
+    }
+}
+
+async function deleteSelectedReportRequests() {
+    if (currentUser?.role !== 'SuperAdmin') {
+        Swal.fire('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะ SuperAdmin เท่านั้นที่สามารถลบรายการได้ค่ะ 😅', 'error');
+        return;
+    }
+
+    const checkedNodes = document.querySelectorAll('.reportRowCheckbox:checked');
+    const selectedIds = Array.from(checkedNodes).map(cb => cb.value).filter(Boolean);
+
+    if (selectedIds.length === 0) {
+        Swal.fire('ยังไม่ได้เลือกรายการ', 'กรุณาติ๊กเลือกรายการที่ต้องการลบก่อนนะคะ 😊', 'info');
+        return;
+    }
+
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบข้อมูลที่เลือก?',
+        html: `ต้องการลบคำขอโอทีที่เลือกจำนวน <b class="text-red-500 font-bold">${selectedIds.length}</b> รายการใช่ไหมคะ?<br><span class="text-xs text-slate-500">⚠️ ข้อมูลจะถูกลบออกจากระบบอย่างถาวร และชั่วโมงโอทีจะถูกตัดออกจากรายงานโดยอัตโนมัติค่ะ</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: `ใช่, ลบ ${selectedIds.length} รายการ`,
+        cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+        await executeDeleteReportRequests(selectedIds);
+    }
+}
+
+async function executeDeleteReportRequests(ids) {
+    if (!ids || ids.length === 0) return;
+
+    Swal.fire({
+        title: 'กำลังลบข้อมูล...',
+        html: `กำลังดำเนินการลบ ${ids.length} รายการ กรุณารอสักครู่นะคะ ✨`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        const CHUNK_SIZE = 50;
+        let deletedCount = 0;
+
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+            const chunk = ids.slice(i, i + CHUNK_SIZE);
+            const { data: deleted, error } = await supabaseClient
+                .from('ot_requests')
+                .delete()
+                .in('id', chunk)
+                .select('id');
+
+            if (error) throw error;
+            deletedCount += (deleted ? deleted.length : chunk.length);
+        }
+
+        invalidateOTDerivedViews();
+        if (typeof invalidateProcessedApprovalSearchCache === 'function') {
+            invalidateProcessedApprovalSearchCache();
+        }
+        refreshApprovalPendingBadge();
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: `🗑️ ลบข้อมูลเรียบร้อยแล้วจำนวน ${deletedCount} รายการค่ะ`,
+            timer: 2000,
+            showConfirmButton: true
+        });
+
+        // รีโหลดข้อมูลรายงานใหม่
+        await loadReportsData();
+
+    } catch (err) {
+        console.error("Execute Delete Report Requests Error:", err);
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถลบรายการได้ กรุณาตรวจสอบสิทธิ์และลองใหม่อีกครั้งนะคะ', 'error');
+    }
 }
 // ===================================================
 // ฟังก์ชัน Dark Mode และ เปิด-ปิดตา รหัสผ่าน 🌙✨

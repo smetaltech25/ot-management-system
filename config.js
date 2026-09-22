@@ -14,7 +14,7 @@ const OMS_PRODUCTION_CONFIG = {
 const OMS_STAGING_CONFIG = {
     authMode: 'supabase',
     url: "https://hxxfecaiqhphknuotifz.supabase.co",
-    publishableKey: "sb_publishable_woNXd7vyicSAtxcl_yN_aA_Pl4GT9vL"
+    publishableKey: ""
 };
 
 const OMS_HAS_STAGING_KEY = OMS_STAGING_CONFIG.publishableKey.trim().length > 0;

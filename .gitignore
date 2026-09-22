@@ -16,3 +16,4 @@ Thumbs.db
 scratch/
 outputs/
 supabase/.temp/
+server.js
