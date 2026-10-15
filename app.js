@@ -793,6 +793,17 @@ function normalizeApprovalSearchValue(value) {
 function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSearchTerm) {
     if (!normalizedTerm) return true;
 
+    let statusText = '';
+    if (request?.status === 'Approved') {
+        statusText = 'อนุมัติแล้ว approved';
+    } else if (request?.processed_step === 2) {
+        statusText = 'อนุมัติขั้นที่ 2 ขั้นที่ 2 step 2';
+    } else if (request?.processed_step === 1) {
+        statusText = 'อนุมัติขั้นที่ 1 ขั้นที่ 1 step 1';
+    } else if (request?.status === 'Rejected') {
+        statusText = 'ไม่อนุมัติ rejected';
+    }
+
     const searchableValues = [
         request?.id,
         user?.fullname,
@@ -800,7 +811,8 @@ function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSea
         AGENCY_NAME_MAP[user?.agency],
         user?.department,
         DEPARTMENT_NAME_MAP[user?.department],
-        getUserOrganizationLabel(user)
+        getUserOrganizationLabel(user),
+        statusText
     ];
 
     const searchableText = searchableValues
@@ -4171,29 +4183,117 @@ const APPROVAL_USER_QUERY_BATCH_SIZE = 150;
 let processedApprovalCurrentPage = 1;
 let processedApprovalTotalCount = 0;
 
+async function fetchStepApprovedPendingRequests() {
+    const { data: pendingRequests, error: reqErr } = await supabaseClient
+        .from('ot_requests')
+        .select('id, user_id, ot_type_id, date_start, description, status, submit_date')
+        .eq('status', 'Pending')
+        .order('submit_date', { ascending: false })
+        .order('id', { ascending: false });
+
+    if (reqErr) throw reqErr;
+    if (!pendingRequests || pendingRequests.length === 0) return [];
+
+    const reqIds = pendingRequests.map(r => r.id);
+    const { data: steps, error: stepErr } = await supabaseClient
+        .from('approval_steps')
+        .select('request_id, step_order, status')
+        .in('request_id', reqIds);
+
+    if (stepErr) throw stepErr;
+
+    const stepsByReq = new Map();
+    (steps || []).forEach(s => {
+        if (!stepsByReq.has(s.request_id)) stepsByReq.set(s.request_id, []);
+        stepsByReq.get(s.request_id).push(s);
+    });
+
+    const result = [];
+    pendingRequests.forEach(req => {
+        const reqSteps = stepsByReq.get(req.id) || [];
+        const step1 = reqSteps.find(s => Number(s.step_order) === 1);
+        const step2 = reqSteps.find(s => Number(s.step_order) === 2);
+
+        if (step2?.status === 'Approved' && step1?.status === 'Approved') {
+            result.push({
+                ...req,
+                processed_step: 2
+            });
+        } else if (step1?.status === 'Approved') {
+            result.push({
+                ...req,
+                processed_step: 1
+            });
+        }
+    });
+
+    return result;
+}
+
 async function fetchProcessedApprovalPage(page = processedApprovalCurrentPage) {
     const safePage = Math.max(1, Number(page) || 1);
-    const from = (safePage - 1) * PROCESSED_APPROVAL_PAGE_SIZE;
-    const to = from + PROCESSED_APPROVAL_PAGE_SIZE - 1;
-    const { data, error, count } = await supabaseClient
-        .from('ot_requests')
-        .select('id, user_id, ot_type_id, date_start, description, status, submit_date', { count: 'exact' })
-        .in('status', ['Approved', 'Rejected'])
-        .order('submit_date', { ascending: false })
-        .order('id', { ascending: false })
-        .range(from, to);
+    const stepRequests = await fetchStepApprovedPendingRequests();
+    const stepCount = stepRequests.length;
 
-    if (error) throw error;
+    const fromIndex = (safePage - 1) * PROCESSED_APPROVAL_PAGE_SIZE;
+    const toIndex = fromIndex + PROCESSED_APPROVAL_PAGE_SIZE - 1;
+
+    let pageStepItems = [];
+    let dbRequests = [];
+    let dbTotalCount = 0;
+
+    if (fromIndex < stepCount) {
+        pageStepItems = stepRequests.slice(fromIndex, Math.min(stepCount, toIndex + 1));
+        const neededFromDb = PROCESSED_APPROVAL_PAGE_SIZE - pageStepItems.length;
+
+        if (neededFromDb > 0) {
+            const { data, error, count } = await supabaseClient
+                .from('ot_requests')
+                .select('id, user_id, ot_type_id, date_start, description, status, submit_date', { count: 'exact' })
+                .in('status', ['Approved', 'Rejected'])
+                .order('submit_date', { ascending: false })
+                .order('id', { ascending: false })
+                .range(0, neededFromDb - 1);
+
+            if (error) throw error;
+            dbRequests = data || [];
+            dbTotalCount = count || 0;
+        } else {
+            const { count, error } = await supabaseClient
+                .from('ot_requests')
+                .select('id', { count: 'exact', head: true })
+                .in('status', ['Approved', 'Rejected']);
+
+            if (error) throw error;
+            dbTotalCount = count || 0;
+        }
+    } else {
+        const dbFrom = fromIndex - stepCount;
+        const dbTo = dbFrom + PROCESSED_APPROVAL_PAGE_SIZE - 1;
+
+        const { data, error, count } = await supabaseClient
+            .from('ot_requests')
+            .select('id, user_id, ot_type_id, date_start, description, status, submit_date', { count: 'exact' })
+            .in('status', ['Approved', 'Rejected'])
+            .order('submit_date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(dbFrom, dbTo);
+
+        if (error) throw error;
+        dbRequests = data || [];
+        dbTotalCount = count || 0;
+    }
 
     return {
-        requests: data || [],
-        totalCount: count || 0,
+        requests: [...pageStepItems, ...dbRequests],
+        totalCount: stepCount + dbTotalCount,
         page: safePage
     };
 }
 
 async function fetchAllProcessedApprovalRequests() {
-    const requests = [];
+    const stepRequests = await fetchStepApprovedPendingRequests();
+    const dbRequests = [];
     let from = 0;
 
     while (true) {
@@ -4209,12 +4309,12 @@ async function fetchAllProcessedApprovalRequests() {
         if (error) throw error;
 
         const chunk = data || [];
-        requests.push(...chunk);
+        dbRequests.push(...chunk);
         if (chunk.length < PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE) break;
         from += PROCESSED_APPROVAL_SEARCH_CHUNK_SIZE;
     }
 
-    return requests;
+    return [...stepRequests, ...dbRequests];
 }
 
 async function fetchApprovalUsersByIds(userIds) {
@@ -4486,6 +4586,10 @@ async function loadProcessedApprovalData() {
             let statusBadge = '';
             if (request.status === 'Approved') {
                 statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"><i class="bx bx-check-circle mr-1"></i> อนุมัติแล้ว</span>';
+            } else if (request.processed_step === 2) {
+                statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50"><i class="bx bx-time-five mr-1"></i> อนุมัติขั้นที่ 2</span>';
+            } else if (request.processed_step === 1) {
+                statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50"><i class="bx bx-time-five mr-1"></i> อนุมัติขั้นที่ 1</span>';
             } else {
                 statusBadge = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50"><i class="bx bx-x-circle mr-1"></i> ไม่อนุมัติ</span>';
             }
@@ -4682,15 +4786,35 @@ async function superAdminSaveEditedOT() {
     if (confirm.isConfirmed) {
         Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            const { data, error } = await supabaseClient.rpc('oms_superadmin_update_processed_ot', {
-                target_request_id: reqId,
-                target_ot_type_id: newOtTypeId,
-                target_date_start: newDate,
-                target_description: newDesc
-            });
+            let saveSucceeded = false;
+            try {
+                const { data, error } = await supabaseClient.rpc('oms_superadmin_update_processed_ot', {
+                    target_request_id: reqId,
+                    target_ot_type_id: newOtTypeId,
+                    target_date_start: newDate,
+                    target_description: newDesc
+                });
+                if (!error && data && data.length === 1) {
+                    saveSucceeded = true;
+                }
+            } catch (rpcErr) {
+                console.warn("RPC oms_superadmin_update_processed_ot fallback:", rpcErr);
+            }
 
-            if (error) throw error;
-            if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
+            if (!saveSucceeded) {
+                const { data: updatedData, error: directErr } = await supabaseClient
+                    .from('ot_requests')
+                    .update({
+                        ot_type_id: newOtTypeId,
+                        date_start: newDate,
+                        description: newDesc
+                    })
+                    .eq('id', reqId)
+                    .select('id');
+
+                if (directErr) throw directErr;
+                if (!updatedData || updatedData.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
+            }
 
             invalidateOTDerivedViews();
             invalidateProcessedApprovalSearchCache();
@@ -4728,12 +4852,41 @@ async function superAdminConfirmResetStatus() {
     if (result.isConfirmed) {
         Swal.fire({ title: 'กำลังดำเนินการ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            const { data, error } = await supabaseClient.rpc('oms_superadmin_reset_processed_ot', {
-                target_request_id: reqId
-            });
+            let resetSucceeded = false;
+            try {
+                const { data, error } = await supabaseClient.rpc('oms_superadmin_reset_processed_ot', {
+                    target_request_id: reqId
+                });
+                if (!error && data && data.length === 1) {
+                    resetSucceeded = true;
+                }
+            } catch (rpcErr) {
+                console.warn("RPC oms_superadmin_reset_processed_ot fallback:", rpcErr);
+            }
 
-            if (error) throw error;
-            if (!data || data.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
+            if (!resetSucceeded) {
+                const { error: stepsErr } = await supabaseClient
+                    .from('approval_steps')
+                    .update({
+                        status: 'Pending',
+                        approved_at: null,
+                        comment: null
+                    })
+                    .eq('request_id', reqId);
+                if (stepsErr) throw stepsErr;
+
+                const { data: updatedReq, error: reqErr } = await supabaseClient
+                    .from('ot_requests')
+                    .update({
+                        status: 'Pending',
+                        current_step: 1,
+                        rejected_reason: null
+                    })
+                    .eq('id', reqId)
+                    .select('id');
+                if (reqErr) throw reqErr;
+                if (!updatedReq || updatedReq.length !== 1) throw new Error('ไม่พบรายการที่ดำเนินการแล้ว');
+            }
 
             invalidateOTDerivedViews();
             invalidateProcessedApprovalSearchCache();
@@ -4776,7 +4929,6 @@ async function superAdminConfirmDelete() {
                 .from('ot_requests')
                 .delete()
                 .eq('id', reqId)
-                .in('status', ['Approved', 'Rejected'])
                 .select('id');
 
             if (error) throw error;

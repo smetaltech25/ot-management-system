@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 22 กันยายน 2026
+**อัปเดตล่าสุด:** 15 ตุลาคม 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
 
@@ -13,8 +13,32 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20260922-1` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20261015-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 แสดงสถานะอนุมัติขั้นที่ 1 และ 2 ในเมนูดำเนินการแล้วของ SuperAdmin พร้อมเปิดให้แก้ไขได้ — Deploy 15/10/2026
+
+* **ความต้องการ:** ในแท็บ "ดำเนินการแล้ว (SuperAdmin)" เดิมแสดงเฉพาะคำขอที่ `status in ('Approved', 'Rejected')` เท่านั้น ทำให้คำขอที่ผ่านการอนุมัติขั้นที่ 1 แล้ว (รอขั้น 2) หรือผ่านขั้นที่ 2 แล้ว (รอขั้น 3) ซึ่งยังมีสถานะในคำขอหลักเป็น `Pending` ไม่ปรากฏในหน้านี้เลย และไม่สามารถกดแก้ไขได้ พี่ต้นต้องการให้นำคำขอที่ผ่านขั้นที่ 1 และขั้นที่ 2 มาแสดงในหน้านี้ แสดงป้ายสถานะชัดเจน และเปิดให้กดปุ่ม `[ ✏️ แก้ไข ]` เพื่อจัดการข้อมูลได้เหมือนเดิม โดยคำขอใหม่ที่ยังรอขั้นที่ 1 (ยังไม่มีใครอนุมัติ) จะไม่นำมาแสดง
+* **การปรับปรุงการดึงข้อมูลและแสดงผลใน `app.js`:**
+  * เพิ่มฟังก์ชัน `fetchStepApprovedPendingRequests()`: ตรวจสอบคำขอสถานะ `Pending` ที่มีประวัติการอนุมัติใน `approval_steps` โดยหาก Step 2 อนุมัติแล้วจะกำหนดเป็น `processed_step = 2` และหาก Step 1 อนุมัติแล้วจะกำหนดเป็น `processed_step = 1` ส่วนคำขอที่ Step 1 ยังไม่อนุมัติจะถูกกรองออก
+  * ปรับปรุง `fetchProcessedApprovalPage()`: รวมรายการ Step 1/2 เข้ากับรายการ `Approved/Rejected` โดยจัดเรียงแบบ Pagination หน้าละ 50 รายการ และคง Exact count แม่นยำ
+  * ปรับปรุง `fetchAllProcessedApprovalRequests()` และ `doesApprovalItemMatchSearch()`: รองรับการค้นหา (Live Search) ทั้งรหัสคำขอ ชื่อพนักงาน ฝ่าย และข้อความสถานะ `อนุมัติขั้นที่ 1` / `อนุมัติขั้นที่ 2`
+  * ออกแบบป้ายสถานะ (Status Badge) สวยงามตาม Semantic Color:
+    * 🔵 **อนุมัติขั้นที่ 1:** ป้ายสีน้ำเงิน (`bg-blue-50 text-blue-600`) พร้อมไอคอนนาฬิกา
+    * 🟣 **อนุมัติขั้นที่ 2:** ป้ายสีคราม (`bg-indigo-50 text-indigo-600`) พร้อมไอคอนนาฬิกา
+    * 🟢 **อนุมัติแล้ว:** ป้ายสีเขียว (`bg-emerald-50 text-emerald-600`)
+    * 🔴 **ไม่อนุมัติ:** ป้ายสีแดง (`bg-rose-50 text-rose-600`)
+* **การปรับปรุงฟังก์ชันแก้ไขของ SuperAdmin:**
+  * `superAdminSaveEditedOT()`: เพิ่ม Direct update fallback ให้รองรับการอัปเดตคำขอสถานะ `Pending` ของ Step 1/2 ได้ทันทีแม้ Database RPC เดิมจะล็อกเฉพาะ Approved/Rejected
+  * `superAdminConfirmResetStatus()`: เพิ่ม Fallback สำหรับการดึงกลับ (Pending) ให้รีเซ็ตทุก Step และตัวคำขอกลับไปเริ่มต้นที่ Step 1 ได้อย่างปลอดภัย
+  * `superAdminConfirmDelete()`: รองรับการลบคำขอได้ทุกสถานะตามนโยบาย RLS `ot_requests_superadmin_delete_any`
+* **ไฟล์ Migration ฐานข้อมูล:**
+  * สร้าง `security/014_superadmin_support_step_processed_ot.sql` อัปเดตฟังก์ชัน `oms_superadmin_update_processed_ot` และ `oms_superadmin_reset_processed_ot` ให้ครอบคลุมทุกสถานะอย่างเป็นทางการ
+* **การทดสอบ:**
+  * รัน `node --check app.js` ผ่าน
+  * เพิ่ม Unit Test ชุดที่ 7 ใน `tests/ot-workflow.test.js` และทดสอบผ่านครบ 7/7 ชุด
 
 ---
 

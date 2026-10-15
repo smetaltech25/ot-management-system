@@ -80,3 +80,26 @@ test('SuperAdmin report bulk and single delete features are properly implemented
     assert.match(sql013Source, /create policy ot_requests_superadmin_delete_any/);
     assert.match(sql013Source, /public\.oms_role\(\) = 'SuperAdmin'/);
 });
+
+test('SuperAdmin processed queue includes Step 1 and Step 2 approved requests with edit capability', () => {
+    const sql014Source = fs.readFileSync(path.join(root, 'security', '014_superadmin_support_step_processed_ot.sql'), 'utf8');
+
+    // Logic in app.js
+    assert.match(appSource, /async function fetchStepApprovedPendingRequests/);
+    assert.match(appSource, /processed_step:\s*1/);
+    assert.match(appSource, /processed_step:\s*2/);
+    assert.match(appSource, /อนุมัติขั้นที่ 1/);
+    assert.match(appSource, /อนุมัติขั้นที่ 2/);
+    assert.match(appSource, /const stepRequests = await fetchStepApprovedPendingRequests/);
+
+    // Direct update fallback in superAdminSaveEditedOT
+    assert.match(appSource, /from\('ot_requests'\)\s*\.update\(\{[\s\S]*ot_type_id: newOtTypeId/);
+
+    // Reset and delete support
+    assert.match(appSource, /from\('approval_steps'\)\s*\.update\(\{[\s\S]*status: 'Pending'/);
+
+    // SQL 014 migration
+    assert.match(sql014Source, /create or replace function public\.oms_superadmin_update_processed_ot/);
+    assert.match(sql014Source, /create or replace function public\.oms_superadmin_reset_processed_ot/);
+    assert.match(sql014Source, /public\.oms_role\(\) <> 'SuperAdmin'/);
+});
