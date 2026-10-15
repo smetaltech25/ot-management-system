@@ -4865,15 +4865,20 @@ async function superAdminConfirmResetStatus() {
             }
 
             if (!resetSucceeded) {
-                const { error: stepsErr } = await supabaseClient
+                const { data: updatedSteps, error: stepsErr } = await supabaseClient
                     .from('approval_steps')
                     .update({
                         status: 'Pending',
                         approved_at: null,
                         comment: null
                     })
-                    .eq('request_id', reqId);
+                    .eq('request_id', reqId)
+                    .select('id');
+
                 if (stepsErr) throw stepsErr;
+                if (!updatedSteps || updatedSteps.length === 0) {
+                    throw new Error('ฐานข้อมูลยังไม่อนุญาตให้รีเซ็ตขั้นอนุมัติ กรุณารันคำสั่ง SQL Migration 014 บน Supabase SQL Editor ก่อนนะคะ');
+                }
 
                 const { data: updatedReq, error: reqErr } = await supabaseClient
                     .from('ot_requests')

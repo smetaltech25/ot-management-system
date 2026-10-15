@@ -92,4 +92,11 @@ revoke all on function public.oms_superadmin_reset_processed_ot(text) from publi
 grant execute on function public.oms_superadmin_update_processed_ot(text, text, text, text) to authenticated;
 grant execute on function public.oms_superadmin_reset_processed_ot(text) to authenticated;
 
+-- Allow SuperAdmin to update approval_steps directly
+drop policy if exists approval_steps_superadmin_update on public.approval_steps;
+create policy approval_steps_superadmin_update
+on public.approval_steps for update to authenticated
+using (public.oms_role() = 'SuperAdmin')
+with check (public.oms_role() = 'SuperAdmin');
+
 commit;
