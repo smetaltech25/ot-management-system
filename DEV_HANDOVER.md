@@ -13,7 +13,7 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20261015-1` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20261015-2` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
 
 ---
@@ -32,13 +32,17 @@
     * 🔴 **ไม่อนุมัติ:** ป้ายสีแดง (`bg-rose-50 text-rose-600`)
 * **การปรับปรุงฟังก์ชันแก้ไขของ SuperAdmin:**
   * `superAdminSaveEditedOT()`: เพิ่ม Direct update fallback ให้รองรับการอัปเดตคำขอสถานะ `Pending` ของ Step 1/2 ได้ทันทีแม้ Database RPC เดิมจะล็อกเฉพาะ Approved/Rejected
-  * `superAdminConfirmResetStatus()`: เพิ่ม Fallback สำหรับการดึงกลับ (Pending) ให้รีเซ็ตทุก Step และตัวคำขอกลับไปเริ่มต้นที่ Step 1 ได้อย่างปลอดภัย
+  * `superAdminConfirmResetStatus()`: ปรับปรุงให้ตรวจสอบ `select('id')` ยืนยันการอัปเดต `approval_steps` จริงเพื่อป้องกันการแจ้งเตือนสำเร็จหลอกหาก RLS ยังไม่อนุมัติ
   * `superAdminConfirmDelete()`: รองรับการลบคำขอได้ทุกสถานะตามนโยบาย RLS `ot_requests_superadmin_delete_any`
-* **ไฟล์ Migration ฐานข้อมูล:**
-  * สร้าง `security/014_superadmin_support_step_processed_ot.sql` อัปเดตฟังก์ชัน `oms_superadmin_update_processed_ot` และ `oms_superadmin_reset_processed_ot` ให้ครอบคลุมทุกสถานะอย่างเป็นทางการ
+* **ไฟล์ Migration ฐานข้อมูล (`security/014_superadmin_support_step_processed_ot.sql`):**
+  * อัปเดตฟังก์ชัน `oms_superadmin_update_processed_ot` และ `oms_superadmin_reset_processed_ot` ให้ครอบคลุมทุกสถานะคำขอ (`Approved`, `Rejected`, `Pending`)
+  * เพิ่ม RLS Policy `approval_steps_superadmin_update` อนุญาตให้ SuperAdmin อัปเดตตาราง `approval_steps` ได้โดยตรง
+  * **สถานะการรันบน Production:** พี่ต้นรันสคริปต์นี้บน Production Supabase ผ่าน SQL Editor สำเร็จเรียบร้อยเมื่อ 15/10/2026 ผลการทดสอบดึงกลับคำขอ OTR-3582 สถานะย้ายกลับไป Step 1 (กำลังรอพิจารณา) ครบทั้ง 3 ขั้นตอนสมบูรณ์แบบ 100%
+* **บทเรียนและข้อควรปฏิบัติสำหรับครั้งต่อไป (ตามคำแนะนำของพี่ต้น):**
+  * ในงานที่มีการเปลี่ยนแปลง Logic หรือเพิ่ม SQL Migration ในฐานข้อมูล **ต้องทำการจำลองทดสอบฝั่ง Database/RPC ก่อนทำการ Deploy เสมอ** และแจ้งเตือนให้ทำการรัน SQL Migration บน Supabase ก่อนการทดสอบบนเว็บจริงทุกครั้ง เพื่อให้ Backend และ Frontend พร้อมทำงานสอดรับกันตั้งแต่แรก
 * **การทดสอบ:**
   * รัน `node --check app.js` ผ่าน
-  * เพิ่ม Unit Test ชุดที่ 7 ใน `tests/ot-workflow.test.js` และทดสอบผ่านครบ 7/7 ชุด
+  * Unit Tests ใน `tests/ot-workflow.test.js` ผ่านครบ 7/7 ชุด
 
 ---
 
