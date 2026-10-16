@@ -778,10 +778,75 @@ function changeMyOTDashboardPage(action) {
 // ----------------===================================
 let approvalSearchTerm = '';
 let approvalSearchDisplayTerm = '';
+let approvalDateFilter = '';
 let approvalSearchLoadToken = 0;
 let processedApprovalSearchCache = null;
 let approvalSearchDebounceTimer = null;
 const APPROVAL_LIVE_SEARCH_DELAY_MS = 300;
+
+const THAI_MONTH_NAMES_FULL = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+const THAI_MONTH_NAMES_SHORT = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+];
+
+function formatApprovalFilterDate(isoDate) {
+    if (!isoDate || typeof isoDate !== 'string') return '';
+    const cleanDate = isoDate.split('T')[0].trim();
+    if (!cleanDate.includes('-')) return cleanDate;
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return cleanDate;
+}
+
+function getApprovalDateSearchableValues(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return [];
+    const cleanDate = dateStr.split('T')[0].trim();
+    if (!cleanDate.includes('-')) return [cleanDate];
+
+    const parts = cleanDate.split('-');
+    if (parts.length !== 3) return [cleanDate];
+
+    const [yearStr, monthStr, dayStr] = parts;
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    const values = [
+        cleanDate,
+        `${dayStr}/${monthStr}/${yearStr}`,
+        `${dayStr}-${monthStr}-${yearStr}`,
+        `${day}/${month}/${yearStr}`,
+        `${dayStr}/${monthStr}`,
+        `${day}/${month}`
+    ];
+
+    if (!isNaN(year)) {
+        const beYear = year + 543;
+        values.push(`${dayStr}/${monthStr}/${beYear}`);
+        values.push(`${day}/${month}/${beYear}`);
+        values.push(String(beYear));
+        values.push(yearStr);
+    }
+
+    if (!isNaN(month) && month >= 1 && month <= 12) {
+        const fullMonth = THAI_MONTH_NAMES_FULL[month - 1];
+        const shortMonth = THAI_MONTH_NAMES_SHORT[month - 1];
+        values.push(fullMonth);
+        values.push(shortMonth);
+        values.push(`${day} ${fullMonth}`);
+        values.push(`${day} ${shortMonth}`);
+        values.push(`${dayStr} ${fullMonth}`);
+        values.push(`${dayStr} ${shortMonth}`);
+    }
+
+    return values;
+}
 
 function normalizeApprovalSearchValue(value) {
     return String(value ?? '')
@@ -790,7 +855,12 @@ function normalizeApprovalSearchValue(value) {
         .toLocaleLowerCase('th-TH');
 }
 
-function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSearchTerm) {
+function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSearchTerm, dateFilter = approvalDateFilter) {
+    if (dateFilter) {
+        const reqDate = String(request?.date_start || '').split('T')[0].trim();
+        if (reqDate !== dateFilter) return false;
+    }
+
     if (!normalizedTerm) return true;
 
     let statusText = '';
@@ -812,7 +882,8 @@ function doesApprovalItemMatchSearch(request, user, normalizedTerm = approvalSea
         user?.department,
         DEPARTMENT_NAME_MAP[user?.department],
         getUserOrganizationLabel(user),
-        statusText
+        statusText,
+        ...getApprovalDateSearchableValues(request?.date_start)
     ];
 
     const searchableText = searchableValues
@@ -827,13 +898,17 @@ function setApprovalSearchFeedback(matchCount, totalCount) {
     const feedback = document.getElementById('approvalSearchFeedback');
     if (!feedback) return;
 
-    if (!approvalSearchTerm) {
+    if (!approvalSearchTerm && !approvalDateFilter) {
         feedback.textContent = '';
         feedback.classList.add('hidden');
         return;
     }
 
-    feedback.textContent = `พบ ${matchCount} จาก ${totalCount} รายการ สำหรับ “${approvalSearchDisplayTerm}”`;
+    const conditions = [];
+    if (approvalSearchDisplayTerm) conditions.push(`“${approvalSearchDisplayTerm}”`);
+    if (approvalDateFilter) conditions.push(`วันที่ ${formatApprovalFilterDate(approvalDateFilter)}`);
+
+    feedback.textContent = `พบ ${matchCount} จาก ${totalCount} รายการ สำหรับ ${conditions.join(' และ ')}`;
     feedback.classList.remove('hidden');
 }
 
@@ -857,6 +932,16 @@ function syncApprovalSearchClearButton() {
     clearBtn.classList.toggle('flex', hasValue);
 }
 
+function syncApprovalDateClearButton() {
+    const input = document.getElementById('approvalDateFilter');
+    const clearBtn = document.getElementById('approvalDateClearBtn');
+    if (!input || !clearBtn) return;
+
+    const hasValue = Boolean(input.value);
+    clearBtn.classList.toggle('hidden', !hasValue);
+    clearBtn.classList.toggle('flex', hasValue);
+}
+
 function applyApprovalSearchFromInput(forceReload = false) {
     const input = document.getElementById('approvalSearchInput');
     const nextDisplayTerm = input?.value.trim() || '';
@@ -867,6 +952,7 @@ function applyApprovalSearchFromInput(forceReload = false) {
     approvalSearchDisplayTerm = nextDisplayTerm;
     approvalSearchTerm = nextSearchTerm;
     processedApprovalCurrentPage = 1;
+    invalidateProcessedApprovalSearchCache();
     loadCurrentApprovalTab();
 }
 
@@ -879,6 +965,31 @@ function handleApprovalSearchInput() {
     }, APPROVAL_LIVE_SEARCH_DELAY_MS);
 }
 
+function handleApprovalDateFilterChange() {
+    const input = document.getElementById('approvalDateFilter');
+    const nextDate = input?.value ? input.value.trim() : '';
+
+    if (nextDate === approvalDateFilter) return;
+
+    approvalDateFilter = nextDate;
+    syncApprovalDateClearButton();
+    processedApprovalCurrentPage = 1;
+    invalidateProcessedApprovalSearchCache();
+    loadCurrentApprovalTab();
+}
+
+function clearApprovalDateFilter() {
+    const input = document.getElementById('approvalDateFilter');
+    if (input) input.value = '';
+
+    approvalDateFilter = '';
+    syncApprovalDateClearButton();
+    processedApprovalCurrentPage = 1;
+    invalidateProcessedApprovalSearchCache();
+    setApprovalSearchFeedback(0, 0);
+    loadCurrentApprovalTab();
+}
+
 function invalidateProcessedApprovalSearchCache() {
     processedApprovalSearchCache = null;
 }
@@ -887,6 +998,13 @@ function submitApprovalSearch(event) {
     if (event) event.preventDefault();
     window.clearTimeout(approvalSearchDebounceTimer);
     approvalSearchDebounceTimer = null;
+
+    const dateInput = document.getElementById('approvalDateFilter');
+    if (dateInput && dateInput.value !== approvalDateFilter) {
+        approvalDateFilter = dateInput.value.trim();
+        syncApprovalDateClearButton();
+    }
+
     syncApprovalSearchClearButton();
     applyApprovalSearchFromInput(true);
 }
@@ -902,6 +1020,7 @@ function clearApprovalSearch() {
     approvalSearchTerm = '';
     processedApprovalCurrentPage = 1;
     syncApprovalSearchClearButton();
+    invalidateProcessedApprovalSearchCache();
     setApprovalSearchFeedback(0, 0);
     loadCurrentApprovalTab();
     input?.focus();
@@ -920,10 +1039,12 @@ async function loadApprovalQueueData() {
 
     const loadToken = ++approvalSearchLoadToken;
     const searchTermSnapshot = approvalSearchTerm;
+    const dateFilterSnapshot = approvalDateFilter;
     const isStaleLoad = () => (
         loadToken !== approvalSearchLoadToken
         || currentApprovalTab !== 'pending'
         || searchTermSnapshot !== approvalSearchTerm
+        || dateFilterSnapshot !== approvalDateFilter
     );
 
     const selectAllCheckbox = document.getElementById("selectAllCheckbox");
@@ -931,9 +1052,13 @@ async function loadApprovalQueueData() {
 
     const showEmptyState = (totalCount = 0) => {
         if (isStaleLoad()) return;
-        const message = searchTermSnapshot
-            ? `ไม่พบรายการรออนุมัติที่ตรงกับ “${approvalSearchDisplayTerm}” ค่ะ`
-            : 'ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨';
+        let message = 'ตอนนี้ไม่มีคำขอโอทีค้างรอให้คุณอนุมัติแล้วค่ะ ✨';
+        if (searchTermSnapshot || dateFilterSnapshot) {
+            const conditions = [];
+            if (searchTermSnapshot) conditions.push(`“${approvalSearchDisplayTerm}”`);
+            if (dateFilterSnapshot) conditions.push(`วันที่ ${formatApprovalFilterDate(dateFilterSnapshot)}`);
+            message = `ไม่พบรายการรออนุมัติที่ตรงกับ ${conditions.join(' และ ')} ค่ะ 🔍`;
+        }
         setApprovalTableMessage(tbody, message);
         setApprovalSearchFeedback(0, totalCount);
     };
@@ -1020,7 +1145,7 @@ async function loadApprovalQueueData() {
         const filteredEligibleSteps = eligibleSteps.filter(step => {
             const request = requestMap.get(step.request_id);
             if (!request) return false;
-            return doesApprovalItemMatchSearch(request, userMap.get(request.user_id), searchTermSnapshot);
+            return doesApprovalItemMatchSearch(request, userMap.get(request.user_id), searchTermSnapshot, dateFilterSnapshot);
         });
 
         if (isStaleLoad()) return;
@@ -4340,7 +4465,7 @@ async function fetchApprovalUsersByIds(userIds) {
     return users;
 }
 
-async function buildProcessedApprovalSearchCache(normalizedTerm) {
+async function buildProcessedApprovalSearchCache(normalizedTerm, dateFilter = approvalDateFilter) {
     let allRequests = processedApprovalSearchCache?.allRequests || null;
     let userMap = processedApprovalSearchCache?.userMap || null;
     let otTypeMap = processedApprovalSearchCache?.otTypeMap || null;
@@ -4363,12 +4488,13 @@ async function buildProcessedApprovalSearchCache(normalizedTerm) {
     }
 
     const matchingRequests = allRequests.filter(request =>
-        doesApprovalItemMatchSearch(request, userMap.get(request.user_id), normalizedTerm)
+        doesApprovalItemMatchSearch(request, userMap.get(request.user_id), normalizedTerm, dateFilter)
     );
 
     superAdminOTTypesCache = otTypes;
     return {
         term: normalizedTerm,
+        date: dateFilter,
         requests: matchingRequests,
         totalUnfilteredCount: allRequests.length,
         allRequests,
@@ -4484,10 +4610,12 @@ async function loadProcessedApprovalData() {
 
     const loadToken = ++approvalSearchLoadToken;
     const searchTermSnapshot = approvalSearchTerm;
+    const dateFilterSnapshot = approvalDateFilter;
     const isStaleLoad = () => (
         loadToken !== approvalSearchLoadToken
         || currentApprovalTab !== 'processed'
         || searchTermSnapshot !== approvalSearchTerm
+        || dateFilterSnapshot !== approvalDateFilter
     );
 
     tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="bx bx-loader-alt bx-spin mr-1"></i>กำลังโหลดรายการที่ดำเนินการแล้ว...</td></tr>';
@@ -4499,9 +4627,11 @@ async function loadProcessedApprovalData() {
         let userMap = new Map();
         let otTypeMap = new Map();
 
-        if (searchTermSnapshot) {
-            if (!processedApprovalSearchCache || processedApprovalSearchCache.term !== searchTermSnapshot) {
-                const newCache = await buildProcessedApprovalSearchCache(searchTermSnapshot);
+        if (searchTermSnapshot || dateFilterSnapshot) {
+            if (!processedApprovalSearchCache
+                || processedApprovalSearchCache.term !== searchTermSnapshot
+                || processedApprovalSearchCache.date !== dateFilterSnapshot) {
+                const newCache = await buildProcessedApprovalSearchCache(searchTermSnapshot, dateFilterSnapshot);
                 if (isStaleLoad()) return;
                 processedApprovalSearchCache = newCache;
             }
@@ -4550,9 +4680,13 @@ async function loadProcessedApprovalData() {
         setApprovalSearchFeedback(processedApprovalTotalCount, totalUnfilteredCount);
 
         if (!processedRequests || processedRequests.length === 0) {
-            const emptyMessage = searchTermSnapshot
-                ? `ไม่พบรายการที่ดำเนินการแล้วซึ่งตรงกับ “${approvalSearchDisplayTerm}” ค่ะ`
-                : 'ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨';
+            let emptyMessage = 'ยังไม่มีรายการที่ดำเนินการแล้วค่ะ ✨';
+            if (searchTermSnapshot || dateFilterSnapshot) {
+                const conditions = [];
+                if (searchTermSnapshot) conditions.push(`“${approvalSearchDisplayTerm}”`);
+                if (dateFilterSnapshot) conditions.push(`วันที่ ${formatApprovalFilterDate(dateFilterSnapshot)}`);
+                emptyMessage = `ไม่พบรายการที่ดำเนินการแล้วซึ่งตรงกับ ${conditions.join(' และ ')} ค่ะ`;
+            }
             setApprovalTableMessage(tbody, emptyMessage);
             renderProcessedApprovalPagination();
             return;

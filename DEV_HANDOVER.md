@@ -2,7 +2,7 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 15 ตุลาคม 2026
+**อัปเดตล่าสุด:** 16 ตุลาคม 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
 
@@ -13,8 +13,32 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20261015-2` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20261016-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 เพิ่มระบบค้นหาและกรองด้วยวันที่ในหน้าการขอโอที (รายการรออนุมัติ OT) — Deploy 16/10/2026
+
+* **ความต้องการ:** ในหน้า "การขอโอที" (Page 2) โดยเฉพาะแท็บ "รออนุมัติ" หัวหน้างานหรือผู้อนุมัติต้องการเลือกวันที่เพื่อแสดงและอนุมัติคำขอโอทีได้ เนื่องจากพนักงานมักจะขอโอทีล่วงหน้าหลายวัน (เช่น วันที่ 16, 17, 18) การสามารถเลือกวันที่เฉพาะเจาะจงจะช่วยให้ผู้อนุมัติตรวจสอบรายการของวันนั้น ติ๊กเลือกทั้งหมด (Select All) และกดอนุมัติรวดเดียวได้อย่างสะดวกและถูกต้อง
+* **การปรับปรุงหน้าจอ (UI) ใน `index.html`:**
+  * เพิ่มช่องเลือกวันที่ `[ 📅 วันที่ทำโอที ]` (`#approvalDateFilter`) พร้อมไอคอนปฏิทิน (`bx-calendar`) ข้างช่องค้นหาหลักในฟอร์ม `#approvalSearchForm`
+  * เพิ่มปุ่มล้างวันที่ `[ ✕ ]` (`#approvalDateClearBtn`) สำหรับเคลียร์การกรองวันที่ในคลิกเดียว
+  * ปรับแต่งกล่องค้นหาให้รองรับ Responsive แบบ Flexbox โดยบน Desktop ขยายความกว้างสูงสุดเป็น `max-w-4xl` และบน Mobile จัดเรียงแนวตั้งอย่างสวยงาม
+  * อัปเดต Placeholder ของช่องค้นหาเป็น `"ค้นหาชื่อ–นามสกุล รหัสคำขอ วันที่ หรือฝ่าย"`
+  * อัปเดต Cache Version ของสคริปต์ใน `index.html` เป็น `app.js?v=20261016-1`
+* **การปรับปรุงฟังก์ชัน (Logic) ใน `app.js`:**
+  * เพิ่มตัวแปรสถานะ `approvalDateFilter` สำหรับจัดเก็บวันที่ที่เลือกในรูปแบบ ISO (`YYYY-MM-DD`)
+  * เพิ่มฟังก์ชัน `formatApprovalFilterDate()` สำหรับแปลงวันที่แสดงผลเป็น `DD/MM/YYYY`
+  * เพิ่มฟังก์ชัน `getApprovalDateSearchableValues()` เพื่อสร้างคำค้นหาวันที่ในรูปแบบต่างๆ เช่น `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY`, `DD/MM`, พ.ศ. (`2569`), และชื่อเดือนภาษาไทย (`ตุลาคม`, `ต.ค.`)
+  * ปรับปรุงฟังก์ชัน `doesApprovalItemMatchSearch()` ให้รองรับทั้งการกรองจาก Date Picker (`dateFilter`) และการพิมพ์ค้นหาวันที่ในช่องค้นหาข้อความปกติ (`normalizedTerm`) ควบคู่กันได้อย่างแม่นยำ
+  * เพิ่มฟังก์ชันควบคุม `handleApprovalDateFilterChange()`, `clearApprovalDateFilter()`, และ `syncApprovalDateClearButton()`
+  * ปรับปรุง `setApprovalSearchFeedback()` ให้แสดงเงื่อนไขการค้นหาที่ชัดเจน เช่น `พบ 4 จาก 8 รายการ สำหรับ “สมชาย” และวันที่ 17/10/2026`
+  * ปรับปรุง `loadApprovalQueueData()` และ `loadProcessedApprovalData()` พร้อมแคช `buildProcessedApprovalSearchCache()` ให้รองรับการกรองตามวันที่อย่างรวดเร็วและป้องกัน Race Conditions ด้วย Token Validation
+* **การทดสอบ:**
+  * ตรวจสอบ Syntax: รัน `node --check app.js` ผ่านเรียบร้อย
+  * Unit Tests: เพิ่มการทดสอบชุดที่ 8 ใน `tests/ot-workflow.test.js` ครอบคลุมการกรองด้วย Date Picker, การพิมพ์ค้นหาวันที่, และการค้นหาแบบผสม (ผลการทดสอบผ่านครบ 8/8 ชุด)
+  * Localhost Testing: พี่ต้นทำการทดสอบผ่าน Localhost (Port 3000) เรียบร้อยและอนุมัติให้ทำการ Deploy ขึ้น Production
 
 ---
 

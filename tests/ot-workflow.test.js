@@ -103,3 +103,56 @@ test('SuperAdmin processed queue includes Step 1 and Step 2 approved requests wi
     assert.match(sql014Source, /create or replace function public\.oms_superadmin_reset_processed_ot/);
     assert.match(sql014Source, /public\.oms_role\(\) <> 'SuperAdmin'/);
 });
+
+test('Approval queue supports date picker filtering and text search by date', () => {
+    const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+    // HTML elements
+    assert.match(htmlSource, /id="approvalDateFilter"/);
+    assert.match(htmlSource, /id="approvalDateClearBtn"/);
+    assert.match(htmlSource, /onchange="handleApprovalDateFilterChange\(\)"/);
+
+    // app.js functions
+    assert.match(appSource, /let approvalDateFilter = '';/);
+    assert.match(appSource, /function handleApprovalDateFilterChange/);
+    assert.match(appSource, /function clearApprovalDateFilter/);
+    assert.match(appSource, /function formatApprovalFilterDate/);
+    assert.match(appSource, /function getApprovalDateSearchableValues/);
+
+    // Test matching logic in sandbox
+    const vm = require('node:vm');
+    const sandbox = {
+        AGENCY_NAME_MAP: { 'MA': 'ฝ่ายผลิต MA' },
+        DEPARTMENT_NAME_MAP: { 'Machine': 'แผนก Machine' },
+        getUserOrganizationLabel: () => 'Machine / MA',
+        approvalSearchTerm: '',
+        approvalDateFilter: ''
+    };
+    vm.createContext(sandbox);
+
+    const matchCode = appSource.slice(
+        appSource.indexOf('const THAI_MONTH_NAMES_FULL ='),
+        appSource.indexOf('function setApprovalSearchFeedback')
+    );
+    vm.runInContext(matchCode, sandbox);
+
+    const req1 = { id: 'OTR-3732', date_start: '2026-10-17', status: 'Pending' };
+    const req2 = { id: 'OTR-3643', date_start: '2026-10-16', status: 'Pending' };
+    const user1 = { fullname: 'สมชาย สงครามศักดิ์', agency: 'MA', department: 'Machine' };
+
+    // Test 1: Date filter picker alone
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req1, user1, '', '2026-10-17'), true);
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req2, user1, '', '2026-10-17'), false);
+
+    // Test 2: Search by date text (DD/MM/YYYY)
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req1, user1, '17/10/2026', ''), true);
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req2, user1, '17/10/2026', ''), false);
+
+    // Test 3: Search by date text (DD/MM)
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req1, user1, '17/10', ''), true);
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req2, user1, '17/10', ''), false);
+
+    // Test 4: Combined search by name AND date picker
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req1, user1, 'สมชาย', '2026-10-17'), true);
+    assert.equal(sandbox.doesApprovalItemMatchSearch(req2, user1, 'สมชาย', '2026-10-17'), false);
+});
