@@ -2,9 +2,10 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 16 ตุลาคม 2026
+**อัปเดตล่าสุด:** 9 พฤศจิกายน 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
+**ผู้บันทึกการอัปเดตล่าสุด:** จ๊ะ (Codex)
 
 ---
 
@@ -13,8 +14,23 @@
 * **Production URL (GitHub Pages):** [https://smetaltech25.github.io/ot-management-system/](https://smetaltech25.github.io/ot-management-system/)
 * **Production Database (Supabase):** `https://hperamyypofcxajmrskq.supabase.co` (Supabase Auth + RLS)
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
-* **Current Application Script Cache Version:** `app.js?v=20261016-1` (ใน `index.html`)
+* **Current Application Script Cache Version:** `app.js?v=20261109-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 หน้า Login ธีมฤดูหนาวและแก้เวอร์ชันแคช — Deploy 09/11/2026
+
+* **ขอบเขต OMS:** ปรับเฉพาะหน้า Login ให้ใช้ภาพพื้นหลังฤดูหนาวชุดเดียวกับ LMS, การ์ดสีขาว, ช่องกรอกและปุ่มโทนฟ้า, เอฟเฟกต์หิมะที่ปิดได้, Dark Mode และขนาดที่อ่านได้บนมือถือ โดยคง `#loginusername`, `#loginpassword` และ `loginUsersSupabase()` สำหรับการเข้าสู่ระบบเดิม
+* **ไฟล์ที่เปลี่ยน:** `index.html`, `app.js`, `login-winter.css`, `assets/login-winter-background.png` และ `assets/smt-logo.jpg` ไม่มีการเปลี่ยน Database, Auth, Dependency หรือหน้าอื่น
+* **Cache busting:** หลัง deploy ครั้งแรกพบว่า `index.html` ยังอ้าง `app.js?v=20261016-1` จึงแก้เป็น `app.js?v=20261109-1` และเพิ่ม `login-winter.css?v=20261109-1` ใน commit แยก GitHub Pages ส่ง `Cache-Control: max-age=600` จึงอาจมี HTML เก่าอยู่ในแคชของเบราว์เซอร์ได้สูงสุดประมาณ 10 นาทีหลังเผยแพร่
+* **Commit และบัญชี deploy OMS:** `fa5bec6` (ธีม) ตามด้วย `9de99ec` (เวอร์ชันแคช) บน `main` ของ `smetaltech25/ot-management-system`; push โดยใช้บัญชี `smetaltech25` เฉพาะคำสั่ง
+* **งาน LMS ที่เผยแพร่พร้อมกัน:** `27f53a0` บน `main` ของ `smetaltech26/leave-management-system`; ใช้สคริปต์ `npm run deploy` เผยแพร่ `gh-pages` commit `49e4810` ด้วยบัญชี `smetaltech26` งาน LMS อยู่คนละ repository และไม่ได้ย้ายโค้ดข้ามระบบ นอกจากใช้ภาพพื้นหลังและโลโก้ต้นฉบับชุดเดียวกัน
+* **การตรวจ:** `node --check app.js`, `node --test tests/ot-workflow.test.js` ผ่าน 8/8, `git diff --check` ผ่าน; ตรวจ OMS ใน Edge ขนาด Desktop และกรอบมือถือกว้าง 390/320px รวมทั้ง Dark Mode, ปุ่มหิมะ และแสดงรหัสผ่าน; LMS `npm run build` ผ่าน
+* **Production ที่ตรวจจริง:** [OMS](https://smetaltech25.github.io/ot-management-system/) ตอบ HTTP 200 และ HTML อ้าง JS/CSS เวอร์ชัน `20261109-1` ซึ่งโหลดได้ 200 พร้อมโค้ดใหม่; [LMS](https://smetaltech26.github.io/leave-management-system/) ตอบ HTTP 200 และโหลด asset hash ใหม่ของ Vite ได้ 200; ตรวจภาพหน้า Login จริงของทั้งสองระบบใน Edge Desktop
+* **ข้อจำกัด:** ยังไม่ได้ทดสอบการ Login ด้วยบัญชีผู้ใช้จริงหรือทดสอบบน iPhone จริง การทดสอบภาพบนมือถือเป็นการจำลอง viewport ใน Edge
+
+รายละเอียดสำหรับผู้รับช่วงต่ออยู่ใน `HANDOVER_OMS_WINTER_LOGIN_20261109.md`
 
 ---
 
