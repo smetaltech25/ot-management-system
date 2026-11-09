@@ -4238,22 +4238,52 @@ function toggleDarkMode() {
 
 // อัปเดตหน้าตาปุ่มสวิตช์ (อัปเดตให้รองรับทั้ง 2 ปุ่ม)
 function updateDarkModeKnob(isDark) {
-    const knob1 = document.getElementById('darkModeKnob');
     const icon1 = document.getElementById('darkModeIcon');
+    const loginThemeToggle = document.getElementById('loginThemeToggle');
     const knob2 = document.getElementById('darkModeKnob2');
     const icon2 = document.getElementById('darkModeIcon2');
+
+    if (icon1) icon1.textContent = isDark ? '☀' : '☾';
+    if (loginThemeToggle) {
+        loginThemeToggle.setAttribute('aria-pressed', String(isDark));
+        loginThemeToggle.setAttribute('aria-label', isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด');
+    }
     
     if (isDark) {
-        if(knob1) { knob1.style.transform = 'translateX(24px)'; icon1.className = 'bx bx-moon text-[10px] text-blue-500'; }
         if(knob2) { knob2.style.transform = 'translateX(24px)'; icon2.className = 'bx bx-moon text-[10px] text-blue-500'; }
     } else {
-        if(knob1) { knob1.style.transform = 'translateX(0)'; icon1.className = 'bx bx-sun text-[10px] text-amber-500'; }
         if(knob2) { knob2.style.transform = 'translateX(0)'; icon2.className = 'bx bx-sun text-[10px] text-amber-500'; }
+    }
+}
+
+function toggleLoginSnow() {
+    const snow = document.getElementById('loginSnow');
+    const button = document.getElementById('loginSnowToggle');
+    if (!snow || !button) return;
+    const isSnowing = snow.classList.toggle('winter-login__snow--paused') === false;
+    button.setAttribute('aria-pressed', String(isSnowing));
+    button.setAttribute('aria-label', isSnowing ? 'ปิดเอฟเฟกต์หิมะ' : 'เปิดเอฟเฟกต์หิมะ');
+}
+
+function createLoginSnow() {
+    const snow = document.getElementById('loginSnow');
+    if (!snow || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (let index = 0; index < 28; index++) {
+        const flake = document.createElement('span');
+        flake.className = 'winter-login__flake';
+        flake.style.setProperty('--flake-left', `${(index * 47.3) % 100}%`);
+        flake.style.setProperty('--flake-size', `${3 + (index % 4)}px`);
+        flake.style.setProperty('--flake-duration', `${13 + (index % 8)}s`);
+        flake.style.setProperty('--flake-delay', `${-index * .8}s`);
+        flake.style.setProperty('--flake-drift', `${(index % 2 ? 1 : -1) * (12 + index % 16)}px`);
+        snow.appendChild(flake);
     }
 }
 
 // ตรวจสอบโหมดตอนเปิดเว็บครั้งแรก
 document.addEventListener('DOMContentLoaded', async () => {
+    updateDarkModeKnob(document.documentElement.classList.contains('dark'));
+    createLoginSnow();
     // (โค้ดฟังก์ชัน Dark Mode เดิมของพี่ต้นปล่อยไว้เหมือนเดิมนะคะ) ...
 
     if (isSupabaseAuthMode()) {
@@ -4285,14 +4315,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 function togglePasswordVisibility() {
     const pwdInput = document.getElementById('loginpassword');
     const eyeIcon = document.getElementById('eyeIcon');
+    const eyeButton = eyeIcon.closest('button');
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
-        eyeIcon.classList.remove('bx-show');
-        eyeIcon.classList.add('bx-hide');
+        eyeIcon.classList.add('is-visible');
+        eyeButton.setAttribute('aria-label', 'ซ่อนรหัสผ่าน');
     } else {
         pwdInput.type = 'password';
-        eyeIcon.classList.remove('bx-hide');
-        eyeIcon.classList.add('bx-show');
+        eyeIcon.classList.remove('is-visible');
+        eyeButton.setAttribute('aria-label', 'แสดงรหัสผ่าน');
     }
 }
 

@@ -1,0 +1,259 @@
+body { margin: 0; }
+#pageformLogin, #pageformLogin * { box-sizing: border-box; }
+
+#pageformLogin {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100svh;
+  padding: max(4rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  overflow: hidden;
+  background: #a6e9ef url('./assets/login-winter-background.png') center center / cover no-repeat;
+}
+
+html.dark #pageformLogin::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(4, 17, 35, .68);
+  pointer-events: none;
+}
+
+.winter-login__snow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.winter-login__snow--paused { visibility: hidden; }
+
+.winter-login__flake {
+  position: absolute;
+  top: -12px;
+  left: var(--flake-left);
+  width: var(--flake-size);
+  height: var(--flake-size);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 5px rgba(255, 255, 255, .55);
+  opacity: .82;
+  animation: winter-login-fall var(--flake-duration) linear var(--flake-delay) infinite;
+}
+
+@keyframes winter-login-fall {
+  from { transform: translate3d(0, -2vh, 0); }
+  to { transform: translate3d(var(--flake-drift), 115vh, 0); }
+}
+
+.winter-login__card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 31rem);
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, .85);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 24px 65px rgba(20, 89, 113, .19), 0 4px 12px rgba(20, 89, 113, .08);
+}
+
+html.dark .winter-login__card {
+  border-color: rgba(171, 219, 234, .2);
+  background: rgba(17, 32, 52, .97);
+  box-shadow: 0 24px 65px rgba(0, 5, 15, .38);
+}
+
+.winter-login__controls {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.winter-login__version {
+  padding: .35rem .55rem;
+  border: 1px solid #dbeafe;
+  border-radius: .55rem;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: .65rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+html.dark .winter-login__version {
+  border-color: #30516e;
+  background: #20394f;
+  color: #a8d8ff;
+}
+
+.winter-login__control {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #eef5fa;
+  color: #46647c;
+  font-size: 1rem;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.winter-login__control:hover { background: #d9eff7; color: #076f88; transform: translateY(-1px); }
+#loginSnowToggle[aria-pressed='true'] { color: #047f9b; }
+html.dark .winter-login__control { background: #253c54; color: #d2e7f3; }
+html.dark .winter-login__control:hover { background: #345875; color: #fff; }
+
+.winter-login__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  margin: 2.75rem 0 1.75rem;
+}
+
+.winter-login__logo {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  padding: .25rem;
+  border-radius: .8rem;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 1px 3px rgba(19, 50, 72, .13);
+}
+
+.winter-login__brand h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+html.dark .winter-login__brand h1,
+html.dark .winter-login__heading { color: #f8fafc; }
+
+.winter-login__heading {
+  margin: 0 0 1.5rem;
+  color: #1e293b;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.winter-login__form { display: grid; gap: 1.15rem; }
+.winter-login__field label { display: block; margin-bottom: .45rem; color: #475569; font-size: .875rem; font-weight: 500; }
+html.dark .winter-login__field label { color: #d2e7f3; }
+.winter-login__password { position: relative; }
+
+#pageformLogin .winter-login__input {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  padding: .75rem 1rem;
+  border: 1px solid #d6e5f5;
+  border-radius: .75rem;
+  background: #eaf3ff;
+  color: #102c46;
+  font-size: .875rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+#pageformLogin .winter-login__password input { padding-right: 3rem; }
+#pageformLogin .winter-login__input::placeholder { color: #70879d; opacity: 1; }
+#pageformLogin .winter-login__input:hover { border-color: #9fc5e9; }
+#pageformLogin .winter-login__input:focus { outline: none; border-color: #1b8fce; background: #f6fbff; box-shadow: 0 0 0 3px rgba(27, 143, 206, .18); }
+
+html.dark #pageformLogin .winter-login__input {
+  border-color: #34516f !important;
+  background: #1e344c !important;
+  color: #f4fbff !important;
+}
+
+html.dark #pageformLogin .winter-login__input::placeholder { color: #b8cee2; }
+html.dark #pageformLogin .winter-login__input:focus { border-color: #66cdeb !important; background: #263f59 !important; }
+
+.winter-login__eye {
+  position: absolute;
+  inset: 0 .5rem 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7f9bb5;
+  font-size: 1.25rem;
+}
+
+.winter-login__eye:hover { color: #176d9c; }
+.winter-login__eye-slash { display: none; }
+#eyeIcon.is-visible .winter-login__eye-slash { display: block; }
+.winter-login__options { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.winter-login__options a, .winter-login__signup a { color: #147bf1; text-decoration: none; }
+.winter-login__options a:hover, .winter-login__signup a:hover { text-decoration: underline; }
+.winter-login__options a { font-size: .8rem; white-space: nowrap; }
+.winter-login__remember { display: inline-flex; align-items: center; gap: .5rem; color: #64748b; font-size: .8rem; cursor: pointer; }
+.winter-login__remember input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.winter-login__switch { position: relative; width: 2.25rem; height: 1.2rem; flex: none; border-radius: 1rem; background: #cbd5e1; transition: background-color 160ms ease; }
+.winter-login__switch::after { content: ''; position: absolute; top: .15rem; left: .15rem; width: .9rem; height: .9rem; border-radius: 50%; background: #fff; transition: transform 160ms ease; }
+.winter-login__remember input:checked + .winter-login__switch { background: #147bf1; }
+.winter-login__remember input:checked + .winter-login__switch::after { transform: translateX(1.05rem); }
+.winter-login__remember input:focus-visible + .winter-login__switch { outline: 3px solid #1679b4; outline-offset: 3px; }
+html.dark .winter-login__remember { color: #cbd5e1; }
+
+.winter-login__submit {
+  min-height: 3.4rem;
+  padding: 0 1rem;
+  border: 1px solid #086cda;
+  border-radius: .75rem;
+  background: #147bf1;
+  box-shadow: 0 5px 12px rgba(20, 123, 241, .18);
+  color: #fff;
+  font-size: .875rem;
+  font-weight: 700;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.winter-login__submit:hover { background: #0669d8; box-shadow: 0 7px 17px rgba(20, 123, 241, .25); }
+.winter-login__submit:active { transform: translateY(1px); }
+html.dark .winter-login__submit { border-color: #4ba8ff; background: #146ed1; }
+.winter-login__signup { margin: .1rem 0 0; color: #64748b; font-size: .8rem; text-align: center; }
+.winter-login__credit { margin: 0; color: #0ea5b7; font-size: .75rem; font-weight: 600; text-align: center; }
+html.dark .winter-login__signup { color: #cbd5e1; }
+html.dark .winter-login__credit { color: #67e8f9; }
+
+#pageformLogin button:focus-visible,
+#pageformLogin a:focus-visible,
+#pageformLogin .winter-login__input:focus-visible { outline: 3px solid #1679b4; outline-offset: 3px; }
+
+@media (max-width: 520px) {
+  #pageformLogin { padding-top: max(4.5rem, env(safe-area-inset-top)); padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); background-position: center top; }
+  .winter-login__card { padding: 1.5rem 1.25rem; border-radius: 1.6rem; }
+  .winter-login__brand h1 { font-size: 1rem; }
+  .winter-login__heading { font-size: 1.4rem; }
+  #pageformLogin .winter-login__input { font-size: 1rem; }
+}
+
+@media (max-width: 360px) {
+  .winter-login__card { padding-inline: 1rem; }
+  .winter-login__brand { gap: .5rem; }
+  .winter-login__logo { width: 2.5rem; height: 2.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winter-login__snow, #loginSnowToggle { display: none; }
+  .winter-login__control, .winter-login__input, .winter-login__switch, .winter-login__switch::after, .winter-login__submit { transition-duration: .01ms; }
+}
