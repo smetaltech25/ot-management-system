@@ -1623,7 +1623,11 @@ function renderSelectedApproverChips() {
     });
 }
 
+let isSubmittingOT = false;
+
 async function submitOTRequestSupabase() {
+    if (isSubmittingOT) return;
+
     const rawDateStart = document.getElementById("reqDateStart").value;
     const dateStart = normalizeDateToISO(rawDateStart);
     const otType = document.getElementById("reqOtType").value;
@@ -1668,7 +1672,22 @@ async function submitOTRequestSupabase() {
         if (!confirmDate.isConfirmed) return;
     }
 
+    const submitBtn = document.getElementById("btnSubmitOt");
+    const cancelBtn = document.getElementById("btnCancelOt");
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : 'ส่งคำขออนุมัติ 🚀';
+
     try {
+        isSubmittingOT = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add("opacity-70", "cursor-not-allowed");
+            submitBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin mr-1.5'></i> กำลังส่งคำขอ...";
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = true;
+            cancelBtn.classList.add("opacity-50", "cursor-not-allowed");
+        }
+
         const nowObj = new Date();
 const d = String(nowObj.getDate()).padStart(2, '0');
 const m = String(nowObj.getMonth() + 1).padStart(2, '0');
@@ -1747,8 +1766,6 @@ const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
 
         invalidateOTDerivedViews();
 
-        Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค่ะ!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
-        
         // 🚀 ส่งสัญญาณ Webhook แจ้งเตือนขอ OT
         if (!editId) {
             const notifyPayload = {
@@ -1769,16 +1786,42 @@ const todayStr = `${d}/${m}/${y} : ${h}:${min}`;
             }).catch(err => console.error(err));
         }
         
-        closeRequestFormModal();
+        closeRequestFormModal(true);
         loadMyOTDashboardData(); 
+
+        await Swal.fire('สำเร็จ!', editId ? "📝 บันทึกการแก้ไขคำขอเรียบร้อยแล้วค่ะ!" : "🚀 ส่งใบคำขอ OT ให้พิจารณาอนุมัติเรียบร้อยแล้ว!", 'success');
 
     } catch (err) {
         console.error("Submit Request Error:", err);
         Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกคำขอค่ะ', 'error');
+    } finally {
+        isSubmittingOT = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("opacity-70", "cursor-not-allowed");
+            submitBtn.innerHTML = originalBtnText;
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
     }
 }
 
 function openRequestFormModal() { 
+    isSubmittingOT = false;
+    const submitBtn = document.getElementById("btnSubmitOt");
+    const cancelBtn = document.getElementById("btnCancelOt");
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-70", "cursor-not-allowed");
+        submitBtn.innerHTML = 'ส่งคำขออนุมัติ 🚀';
+    }
+    if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+
     document.getElementById("reqEditId").value = ""; 
     document.getElementById("reqOtType").value = "";
     document.getElementById("reqDateStart").value = "";
@@ -1795,7 +1838,8 @@ function openRequestFormModal() {
     document.getElementById("otRequestFormModal").classList.remove("hidden"); 
 }
 
-function closeRequestFormModal() { 
+function closeRequestFormModal(force = false) { 
+    if (isSubmittingOT && !force) return;
     document.getElementById("otRequestFormModal").classList.add("hidden"); 
 }
 
@@ -2257,6 +2301,19 @@ async function editMyOTRequest(reqId) {
                 if (c.dataset.id == reqData.ot_type_id) c.click(); 
             });
         }, 100);
+
+        isSubmittingOT = false;
+        const submitBtn = document.getElementById("btnSubmitOt");
+        const cancelBtn = document.getElementById("btnCancelOt");
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("opacity-70", "cursor-not-allowed");
+            submitBtn.innerHTML = 'บันทึกการแก้ไข 📝';
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
 
         tempSelectedApprovers = [...finalSelectedApprovers];
         renderSelectedApproverChips();
