@@ -2,10 +2,10 @@
 **โปรเจกต์:** OverTime Management System (OMS)  
 **วันที่บันทึกเดิม:** 21 สิงหาคม 2026
 
-**อัปเดตล่าสุด:** 9 พฤศจิกายน 2026
+**อัปเดตล่าสุด:** 10 พฤศจิกายน 2026
 
 **ผู้บันทึก:** แอ๊น (Antigravity) สำหรับพี่ต้น 💖
-**ผู้บันทึกการอัปเดตล่าสุด:** จ๊ะ (Codex)
+**ผู้บันทึกการอัปเดตล่าสุด:** แอ๊น (Antigravity)
 
 ---
 
@@ -16,6 +16,29 @@
 * **Staging Database สำหรับทดสอบ RLS & Auth:** `https://hxxfecaiqhphknuotifz.supabase.co`
 * **Current Application Script Cache Version:** `app.js?v=20261109-1` (ใน `index.html`)
 * **GitHub Repository:** `https://github.com/smetaltech25/ot-management-system.git` (Branch: `main`)
+
+---
+
+## 🆕 ระบบป้องกันการกดยื่นคำขอ OT ซ้ำ (Double-Click Guard & Loading State) — Deploy 10/11/2026
+
+* **สาเหตุที่ต้องแก้:** ตรวจพบว่าพนักงานสามารถกดยื่นคำขอ OT ซ้ำในวันและช่วงเวลาเดียวกันได้หลายครั้ง (เช่น พบเคสคุณวสันต์ มีคำขอซ้ำ 9 รายการในวันที่ 09/11/2026 โดย 1 รายการเป็น "อนุมัติ" และ 8 รายการเป็น "รออนุมัติ") เกิดจากปุ่มส่งคำขอไม่มีการ Disabled ระหว่างรอผลลัพธ์จากเครือข่าย และไม่มีสถานะ Loading แจ้งเตือน ทำให้พนักงานกดคลิกปุ่มย้ำๆ รัวๆ (Spam Click)
+* **ไฟล์ที่เปลี่ยน:** `index.html` และ `app.js`
+  * `index.html`: เพิ่ม ID ให้ปุ่ม `#btnSubmitOt` และ `#btnCancelOt`
+  * `app.js`: 
+    * เพิ่มตัวแปรล็อก `isSubmittingOT` เพื่อป้องกันการทำงานซ้ำในระดับ Logic ทันทีที่คำขอเริ่มประมวลผล
+    * ปรับปรุงฟังก์ชัน `submitOTRequestSupabase()`: สั่ง `disabled = true` บนปุ่มส่งคำขอพร้อมเปลี่ยนข้อความเป็น `<i class='bx bx-loader-alt bx-spin mr-1.5'></i> กำลังส่งคำขอ...` และคลาส `opacity-70 cursor-not-allowed` ทันทีหลังผ่านการตรวจ Validation
+    * เมื่อบันทึกสำเร็จ: สั่งปิด Modal ทันที (`closeRequestFormModal(true)`), โหลดข้อมูลแดชบอร์ดใหม่ (`loadMyOTDashboardData()`), แล้วจึงแสดง `await Swal.fire(...)` เมื่อกด OK จะเห็นหน้า Dashboard ทันทีโดยไม่มี Modal ค้าง
+    * ครอบด้วยบล็อก `finally`: รีเซ็ตสถานะปุ่มและปลดล็อก `isSubmittingOT = false` เสมอ เพื่อป้องกันปุ่มค้างถาวร
+    * ปรับปรุง `closeRequestFormModal(force = false)`: ป้องกันผู้ใช้เผลอกดปิด Modal หรือกดยกเลิกระหว่างที่ระบบกำลังส่งข้อมูล (`if (isSubmittingOT && !force) return;`)
+    * ปรับปรุง `openRequestFormModal()` และ `editMyOTRequest()`: รีเซ็ตสถานะปุ่มให้พร้อมใช้งานทุกครั้งที่เปิดฟอร์ม
+* **Commit:** `9e188e7` บน `main` ของ `smetaltech25/ot-management-system`
+* **การทดสอบ:** 
+  * `node --check app.js` ผ่าน
+  * `node tests/ot-workflow.test.js` ผ่านครบ 8/8 ชุด (100% PASS)
+  * ทดสอบบน Local Web Server (Port 3000) โดยพี่ต้น ยืนยันการปิดหน้าต่างและคืนสู่หน้า Dashboard อย่างราบรื่น
+* **ผลบน Production:** GitHub Actions `pages build and deployment` รันเสร็จสมบูรณ์ และเผยแพร่โค้ดบน Production แล้ว
+
+รายละเอียดฉบับเต็มอยู่ใน `HANDOVER_OMS_DOUBLE_CLICK_GUARD_20261110.md`
 
 ---
 
